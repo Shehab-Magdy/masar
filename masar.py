@@ -440,27 +440,58 @@ class EmployeeTab(QWidget):
 
     def add_employee(self):
         """
-        Adds a new employee to the database.
-
-        Retrieves the values from the form fields and checks if the name is empty. If it is, shows a critical message box and returns.
-        Executes a INSERT query to add the employee to the employee table, then retrieves the last inserted ID.
-        For each attachment, executes an INSERT query to add the attachment to the attachment table with the last inserted ID, filename, filepath, and is_photo set to 1 if the attachment is the photo and 0 otherwise.
-        Commits the changes, reloads the employees, clears the form, and shows an information message box with a success message.
+        Adds a new employee to the database, or updates the current one if already selected.
+        Prevents duplicate records using 'national_id' as a unique identifier.
         """
         vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
+        national_id = self.form_fields["national_id"].text().strip()
         if not vals[0]:
             QMessageBox.critical(self, "خطأ", "يرجى إدخال الاسم")
             return
+        if not national_id:
+            QMessageBox.critical(self, "خطأ", "يرجى إدخال الرقم القومي")
+            return
+
         c = self.conn.cursor()
-        c.execute(f"INSERT INTO employee ({', '.join(EMPLOYEE_FIELDS)}) VALUES ({', '.join(['?']*len(EMPLOYEE_FIELDS))})", vals)
-        emp_id = c.lastrowid
-        for fname, fpath in self.attachments:
-            c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                      (emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
-        self.conn.commit()
-        self.load_employees()
-        self.clear_form()
-        QMessageBox.information(self, "تم", "تم إضافة الموظف بنجاح")
+
+        # Check for duplicate national_id (ignore current record if editing)
+        if self.selected_emp_id:
+            c.execute("SELECT id FROM employee WHERE national_id=? AND id!=?", (national_id, self.selected_emp_id))
+        else:
+            c.execute("SELECT id FROM employee WHERE national_id=?", (national_id,))
+        if c.fetchone():
+            QMessageBox.critical(self, "خطأ", "هذا الرقم القومي مسجل بالفعل.")
+            return
+
+        # If an employee is selected, update instead of insert
+        if self.selected_emp_id:
+            c.execute(
+                f"UPDATE employee SET {', '.join([f'{f}=?' for f in EMPLOYEE_FIELDS])} WHERE id=?",
+                vals + [self.selected_emp_id]
+            )
+            # Remove old attachments and re-insert
+            c.execute("DELETE FROM attachment WHERE employee_id=?", (self.selected_emp_id,))
+            for fname, fpath in self.attachments:
+                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
+                          (self.selected_emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
+            self.conn.commit()
+            self.load_employees()
+            self.clear_form()
+            QMessageBox.information(self, "تم", "تم تحديث بيانات الموظف بنجاح")
+        else:
+            # Insert new employee
+            c.execute(
+                f"INSERT INTO employee ({', '.join(EMPLOYEE_FIELDS)}) VALUES ({', '.join(['?']*len(EMPLOYEE_FIELDS))})",
+                vals
+            )
+            emp_id = c.lastrowid
+            for fname, fpath in self.attachments:
+                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
+                          (emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
+            self.conn.commit()
+            self.load_employees()
+            self.clear_form()
+            QMessageBox.information(self, "تم", "تم إضافة الموظف بنجاح")
 
     def edit_employee(self):
         """
