@@ -256,6 +256,10 @@ class EmployeeTab(QWidget):
         self.btn_clear.clicked.connect(self.clear_form)
         btns_layout.addWidget(self.btn_clear)
         form_layout.addRow(btns_layout)
+        # Add a button for printing/exporting the filtered list
+        self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
+        self.btn_export_filtered.clicked.connect(self.export_filtered_pdf)
+        form_layout.addRow(self.btn_export_filtered)
         form_widget = QWidget()
         form_widget.setLayout(form_layout)
         main_layout.addWidget(form_widget)
@@ -748,6 +752,102 @@ class EmployeeTab(QWidget):
             self.photo_path = None
             self.display_photo()
 
+    def export_filtered_pdf(self):
+        """
+        Exports the currently filtered list of employees in the table as a PDF, using the same format as the main report.
+        """
+        # Gather data from the table (only visible/filtered rows)
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        rows = []
+        for row_idx in range(self.table.rowCount()):
+            row = []
+            for col_idx in range(self.table.columnCount()):
+                item = self.table.item(row_idx, col_idx)
+                row.append(item.text() if item else "")
+            rows.append(row)
+
+        if not rows:
+            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
+            return
+
+        # Generate default file name with current date and time
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        default_name = f"Employees_Filtered_{now}.pdf"
+
+        # Ask user for file location
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ النتائج كـ PDF",
+            default_name,
+            "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        # Build HTML table with RTL and Arabic font
+        html = f"""
+        <html lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @font-face {{
+                    font-family: 'Amiri';
+                    src: url('Amiri-Regular.ttf');
+                }}
+                body {{
+                    direction: ltr;
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: 10px;
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    table-layout: fixed;
+                }}
+                th, td {{
+                    border: 1px solid #888;
+                    padding: 6px 4px;
+                    word-break: break-word;
+                    vertical-align: top;
+                    text-align: right;
+                }}
+                th {{
+                    background: #b3d1f7;
+                }}
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align:center;">تقرير الموظفين (حسب البحث)</h2>
+            <table dir="ltr">
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        for row in rows:
+            html += "<tr>"
+            for cell in row[::-1]:
+                html += f"<td>{cell if cell else ''}</td>"
+            html += "</tr>"
+        html += """
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+
+        # Save HTML to PDF using WeasyPrint
+        try:
+            css = CSS(string='''
+                @page { size: A4 landscape; margin: 1cm; }
+            ''')
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
+
 class ReportTab(QWidget):
     def __init__(self, conn):
         """
@@ -913,6 +1013,7 @@ class ReportTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير التقرير: {e}")
 
+    
 if __name__ == "__main__":
     init_db()
     app = QApplication(sys.argv)
