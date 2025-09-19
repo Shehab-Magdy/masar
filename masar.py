@@ -688,3 +688,6 @@ if __name__ == "__main__":
 3. تأكد من نسخ مجلد attachments بجانب الملف التنفيذي.
 
 """
+
+# Copyright 2025 Shehab.Magdy.Eladl
+# Licensed under the Apache License, Version 2.0 (see LICENSE file)
