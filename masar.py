@@ -327,6 +327,24 @@ class EmployeeTab(QWidget):
             if is_photo:
                 self.photo_path = fpath
         self.display_photo()
+        # Enable double-click to open attachment
+        self.attach_list.itemDoubleClicked.connect(self.open_attachment)
+
+    def open_attachment(self, item):
+        """
+        Opens the selected attachment file in the default application.
+        """
+        # Find the file path for the selected item
+        fname = item.text()
+        for name, path in self.attachments:
+            if name == fname and os.path.exists(path):
+                if sys.platform.startswith('darwin'):
+                    os.system(f'open "{path}"')
+                elif os.name == 'nt':
+                    os.startfile(path)
+                elif os.name == 'posix':
+                    os.system(f'xdg-open "{path}"')
+                break
 
     def display_photo(self):
         """
