@@ -1,1 +1,0 @@
-([('masar', '/Users/shehab.magdy/my_projects/Masar/dist/masar', 'EXECUTABLE')],)
