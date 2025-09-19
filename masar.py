@@ -144,7 +144,7 @@ class MasarMainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(DashboardTab(self.conn), "لوحة التحكم")
         self.tabs.addTab(EmployeeTab(self.conn), "الموظفين")
-        self.tabs.addTab(ReportTab(self.conn), "التقارير")
+
 
 class DashboardTab(QWidget):
     def __init__(self, conn):
@@ -774,6 +774,18 @@ class EmployeeTab(QWidget):
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_Filtered_{now}.pdf"
 
+        # Define int fields for column width
+        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
+
+        # Build colgroup for column widths
+        colgroup = "<colgroup>"
+        for f in EMPLOYEE_FIELDS[::-1]:
+            if f in int_fields:
+                colgroup += '<col style="width:8%;">'
+            else:
+                colgroup += '<col style="width:auto;">'
+        colgroup += "</colgroup>"
+
         # Ask user for file location
         file_path, _ = QFileDialog.getSaveFileName(
             self,
@@ -819,6 +831,7 @@ class EmployeeTab(QWidget):
         <body>
             <h2 style="text-align:center;">تقرير الموظفين (حسب البحث)</h2>
             <table dir="ltr">
+                {colgroup}
                 <thead>
                     <tr>
                         {''.join(f'<th>{h}</th>' for h in headers[::-1])}
@@ -848,76 +861,6 @@ class EmployeeTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
 
-class ReportTab(QWidget):
-    def __init__(self, conn):
-        """
-        Initializes the report tab.
-
-        Sets the window title and layout. It also sets up the signals of the UI elements to their respective slots.
-
-        :param conn: The database connection.
-        :type conn: sqlite3.Connection
-        """
-        super().__init__()
-        self.conn = conn
-        layout = QVBoxLayout()
-        lbl = QLabel("التقارير")
-        lbl.setStyleSheet("font-size:20px; font-weight:bold; color:#1976d2;")
-        layout.addWidget(lbl)
-        btns_layout = QHBoxLayout()
-        # self.btn_basic = QPushButton("تقرير الموظفين الأساسي")
-        # self.btn_basic.clicked.connect(self.basic_report)
-        # btns_layout.addWidget(self.btn_basic)
-        self.btn_full = QPushButton("تقرير شامل للموظفين")
-        self.btn_full.clicked.connect(self.full_report)
-        btns_layout.addWidget(self.btn_full)
-        self.btn_pdf = QPushButton("تصدير كـ PDF")
-        self.btn_pdf.clicked.connect(self.export_pdf)
-        btns_layout.addWidget(self.btn_pdf)
-        layout.addLayout(btns_layout)
-        self.report_text = QTextEdit()
-        self.report_text.setReadOnly(True)
-        layout.addWidget(self.report_text)
-        self.setLayout(layout)
-
-    def basic_report(self):
-        """
-        Generates a basic report of employees with their name, grade, job title, department, and phone number.
-
-        Executes a SELECT query to retrieve all employee records with the specified fields.
-        Then constructs a report string with the retrieved records and sets the report text area to the report string.
-
-        :return: None
-        :rtype: NoneType
-        """
-        c = self.conn.cursor()
-        c.execute(f"SELECT name, grade, job_title, department, phone FROM employee")
-        rows = c.fetchall()
-        report = f"{' | '.join([AR_LABELS[f] for f in ['name','grade','job_title','department','phone']])}\n"
-        report += "-"*80 + "\n"
-        for row in rows:
-            report += " | ".join(row) + "\n"
-        self.report_text.setPlainText(report)
-
-    def full_report(self):
-        """
-        Generates a full report of employees with all their fields.
-
-        Executes a SELECT query to retrieve all employee records with all fields.
-        Then constructs a report string with the retrieved records and sets the report text area to the report string.
-
-        :return: None
-        :rtype: NoneType
-        """
-        c = self.conn.cursor()
-        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
-        rows = c.fetchall()
-        report = f"{' | '.join([AR_LABELS[f] for f in EMPLOYEE_FIELDS])}\n"
-        report += "-"*120 + "\n"
-        for row in rows:
-            report += " | ".join([str(r) if r else "" for r in row]) + "\n"
-        self.report_text.setPlainText(report)
-
     def export_pdf(self):
         """
         Exports the full report as a landscape A4 PDF, one employee per row, wrapped cells, Arabic support, RTL using WeasyPrint.
@@ -938,6 +881,18 @@ class ReportTab(QWidget):
         # Generate default file name with current date and time
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees {now}.pdf"
+
+        # Define int fields for column width
+        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
+
+        # Build colgroup for column widths
+        colgroup = "<colgroup>"
+        for f in EMPLOYEE_FIELDS[::-1]:
+            if f in int_fields:
+                colgroup += '<col style="width:8%;">'
+            else:
+                colgroup += '<col style="width:auto;">'
+        colgroup += "</colgroup>"
 
         # Ask user for file location
         file_path, _ = QFileDialog.getSaveFileName(
@@ -984,6 +939,7 @@ class ReportTab(QWidget):
         <body>
             <h2 style="text-align:center;">تقرير الموظفين</h2>
             <table dir="ltr">
+                {colgroup}
                 <thead>
                     <tr>
                         {''.join(f'<th>{h}</th>' for h in headers[::-1])}
@@ -1012,6 +968,7 @@ class ReportTab(QWidget):
             QMessageBox.information(self, "تم", "تم تصدير التقرير بنجاح كملف PDF.")
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير التقرير: {e}")
+
 
     
 if __name__ == "__main__":

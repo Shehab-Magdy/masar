@@ -212,3 +212,4 @@ masar.db
 .weasyprint/
 attachments/
 dist.zip
+.DS_Store
