@@ -211,3 +211,4 @@ masar.db
 *.pdf
 .weasyprint/
 attachments/
+dist.zip

@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
+import re
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -438,30 +439,77 @@ class EmployeeTab(QWidget):
                 )
                 self.conn.commit()
 
-    def add_employee(self):
+    def validate_employee_form(self, skip_id=None):
         """
-        Adds a new employee to the database, or updates the current one if already selected.
-        Prevents duplicate records using 'national_id' as a unique identifier.
+        Validates the employee form fields.
+        Returns (True, "") if valid, otherwise (False, error_message).
+        skip_id: employee id to skip when checking uniqueness (for edit).
         """
-        vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
+        name = self.form_fields["name"].text().strip()
+        file_no = self.form_fields["file_no"].text().strip()
         national_id = self.form_fields["national_id"].text().strip()
-        if not vals[0]:
-            QMessageBox.critical(self, "خطأ", "يرجى إدخال الاسم")
-            return
-        if not national_id:
-            QMessageBox.critical(self, "خطأ", "يرجى إدخال الرقم القومي")
-            return
+        phone = self.form_fields["phone"].text().strip()
+        date_fields = ["grade_date", "hire_date", "birth_date"]
 
+        # الاسم: مطلوب
+        if not name:
+            return False, "يرجى إدخال الاسم"
+
+        # رقم الملف: مطلوب وفريد
+        if not file_no:
+            return False, "يرجى إدخال رقم الملف"
         c = self.conn.cursor()
+        if skip_id:
+            c.execute("SELECT id FROM employee WHERE file_no=? AND id!=?", (file_no, skip_id))
+        else:
+            c.execute("SELECT id FROM employee WHERE file_no=?", (file_no,))
+        if c.fetchone():
+            return False, "رقم الملف مسجل بالفعل"
 
-        # Check for duplicate national_id (ignore current record if editing)
-        if self.selected_emp_id:
-            c.execute("SELECT id FROM employee WHERE national_id=? AND id!=?", (national_id, self.selected_emp_id))
+        # الرقم القومي: مطلوب، 14 رقم، فريد
+        if not national_id:
+            return False, "يرجى إدخال الرقم القومي"
+        if not (national_id.isdigit() and len(national_id) == 14):
+            return False, "الرقم القومي يجب أن يكون 14 رقمًا"
+        if skip_id:
+            c.execute("SELECT id FROM employee WHERE national_id=? AND id!=?", (national_id, skip_id))
         else:
             c.execute("SELECT id FROM employee WHERE national_id=?", (national_id,))
         if c.fetchone():
-            QMessageBox.critical(self, "خطأ", "هذا الرقم القومي مسجل بالفعل.")
+            return False, "هذا الرقم القومي مسجل بالفعل."
+
+        # رقم الهاتف: اختياري، لكن إذا أدخل يجب أن يكون أرقام فقط
+        if phone and not phone.isdigit():
+            return False, "رقم التليفون يجب أن يحتوي على أرقام فقط"
+
+        # التواريخ: لا يمكن أن تكون في المستقبل
+        today = datetime.date.today()
+        for field in date_fields:
+            date_str = self.form_fields[field].text().strip()
+            if date_str:
+                try:
+                    # Try parsing as YYYY-MM-DD
+                    date_val = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                    if date_val > today:
+                        return False, f"{AR_LABELS[field]} لا يمكن أن يكون في المستقبل"
+                except Exception:
+                    return False, f"صيغة التاريخ غير صحيحة في {AR_LABELS[field]} (يرجى استخدام YYYY-MM-DD)"
+
+        return True, ""
+
+    def add_employee(self):
+        """
+        Adds a new employee to the database, or updates the current one if already selected.
+        Prevents duplicate records using 'national_id' and 'file_no' as unique identifiers.
+        """
+        vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
+        # Validation
+        valid, msg = self.validate_employee_form(self.selected_emp_id)
+        if not valid:
+            QMessageBox.critical(self, "خطأ", msg)
             return
+
+        c = self.conn.cursor()
 
         # If an employee is selected, update instead of insert
         if self.selected_emp_id:
@@ -504,6 +552,11 @@ class EmployeeTab(QWidget):
         """
         if not self.selected_emp_id:
             QMessageBox.critical(self, "خطأ", "يرجى اختيار موظف للتعديل")
+            return
+        # Validation
+        valid, msg = self.validate_employee_form(self.selected_emp_id)
+        if not valid:
+            QMessageBox.critical(self, "خطأ", msg)
             return
         vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
         c = self.conn.cursor()
