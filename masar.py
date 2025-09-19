@@ -300,7 +300,20 @@ class EmployeeTab(QWidget):
         for idx, f in enumerate(EMPLOYEE_FIELDS):
             self.form_fields[f].setText(row_data[idx])
         self.selected_emp_id = emp_id
-        self.load_attachments(emp_id)
+
+        # --- Load attachments and set photo_path correctly ---
+        self.attachments = []
+        self.photo_path = None
+        self.attach_list.clear()
+        c.execute("SELECT filename, filepath, is_photo FROM attachment WHERE employee_id=?", (emp_id,))
+        for fname, fpath, is_photo in c.fetchall():
+            self.attach_list.addItem(fname)
+            self.attachments.append((fname, fpath, is_photo))
+            if is_photo:
+                self.photo_path = fpath
+        self.display_photo()
+        # Enable double-click to open attachment
+        self.attach_list.itemDoubleClicked.connect(self.open_attachment)
 
     def load_attachments(self, emp_id):
         """
@@ -324,7 +337,7 @@ class EmployeeTab(QWidget):
         self.photo_path = None
         for fname, fpath, is_photo in c.fetchall():
             self.attach_list.addItem(fname)
-            self.attachments.append((fname, fpath))
+            self.attachments.append((fname, fpath, is_photo))
             if is_photo:
                 self.photo_path = fpath
         self.display_photo()
@@ -382,16 +395,25 @@ class EmployeeTab(QWidget):
             return
         emp_folder = get_employee_folder(file_no)
         for f in files:
-            fname = os.path.basename(f)
+            orig_fname = os.path.basename(f)
+            ext = os.path.splitext(orig_fname)[1]
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d")
+            # Automatic renaming: originalName_yyyy-mm-dd.ext
+            fname = f"{os.path.splitext(orig_fname)[0]}_{now_str}{ext}"
             dest = os.path.join(emp_folder, fname)
-            if not os.path.exists(dest):
-                try:
-                    with open(f, "rb") as src, open(dest, "wb") as dst:
-                        dst.write(src.read())
-                except Exception:
-                    continue
+            # Ensure unique name if file exists
+            counter = 1
+            while os.path.exists(dest):
+                fname = f"{os.path.splitext(orig_fname)[0]}_{now_str}_{counter}{ext}"
+                dest = os.path.join(emp_folder, fname)
+                counter += 1
+            try:
+                with open(f, "rb") as src, open(dest, "wb") as dst:
+                    dst.write(src.read())
+            except Exception:
+                continue
             self.attach_list.addItem(fname)
-            self.attachments.append((fname, dest))
+            self.attachments.append((fname, dest, 0))  # 0 for normal file
             # Save to DB if editing existing employee
             if self.selected_emp_id:
                 filetype, _ = mimetypes.guess_type(dest)
@@ -422,12 +444,24 @@ class EmployeeTab(QWidget):
                 QMessageBox.critical(self, "خطأ", "يرجى إدخال رقم الملف أولاً")
                 return
             emp_folder = get_employee_folder(file_no)
-            fname = "photo_" + os.path.basename(f)
+            orig_fname = os.path.basename(f)
+            ext = os.path.splitext(orig_fname)[1]
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d")
+            # Automatic renaming: photo_yyyy-mm-dd.ext
+            fname = f"photo_{now_str}{ext}"
             dest = os.path.join(emp_folder, fname)
+            # Ensure unique name if file exists
+            counter = 1
+            while os.path.exists(dest):
+                fname = f"photo_{now_str}_{counter}{ext}"
+                dest = os.path.join(emp_folder, fname)
+                counter += 1
             with open(f, "rb") as src, open(dest, "wb") as dst:
                 dst.write(src.read())
             self.photo_path = dest
             self.display_photo()
+            self.attach_list.addItem(fname)
+            self.attachments.append((fname, dest, 1))  # 1 for photo
             # Save to DB if editing existing employee
             if self.selected_emp_id:
                 filetype, _ = mimetypes.guess_type(dest)
@@ -519,9 +553,11 @@ class EmployeeTab(QWidget):
             )
             # Remove old attachments and re-insert
             c.execute("DELETE FROM attachment WHERE employee_id=?", (self.selected_emp_id,))
-            for fname, fpath in self.attachments:
-                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                          (self.selected_emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
+            for fname, fpath, is_photo in self.attachments:
+                c.execute(
+                    "INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
+                    (self.selected_emp_id, fname, fpath, is_photo)
+                )
             self.conn.commit()
             self.load_employees()
             self.clear_form()
@@ -533,9 +569,11 @@ class EmployeeTab(QWidget):
                 vals
             )
             emp_id = c.lastrowid
-            for fname, fpath in self.attachments:
-                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                          (emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
+            for fname, fpath, is_photo in self.attachments:
+                c.execute(
+                    "INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
+                    (emp_id, fname, fpath, is_photo)
+                )
             self.conn.commit()
             self.load_employees()
             self.clear_form()
@@ -562,9 +600,11 @@ class EmployeeTab(QWidget):
         c = self.conn.cursor()
         c.execute(f"UPDATE employee SET {', '.join([f'{f}=?' for f in EMPLOYEE_FIELDS])} WHERE id=?", vals + [self.selected_emp_id])
         c.execute("DELETE FROM attachment WHERE employee_id=?", (self.selected_emp_id,))
-        for fname, fpath in self.attachments:
-            c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                      (self.selected_emp_id, fname, fpath, 1 if fpath == self.photo_path else 0))
+        for fname, fpath, is_photo in self.attachments:
+            c.execute(
+                "INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
+                (self.selected_emp_id, fname, fpath, is_photo)
+            )
         self.conn.commit()
         self.load_employees()
         self.clear_form()
