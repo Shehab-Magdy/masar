@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
+import mimetypes
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -45,9 +46,7 @@ EMPLOYEE_FIELDS = [
 def init_db():
     """
     Initializes the database by creating the necessary tables if they don't exist.
-    Creates a "employee" table with columns for each employee field and an "attachment" table
-    with columns for the attachment filename, filepath, and whether it's a photo or not.
-    Also creates the attachments directory if it doesn't exist.
+    Now includes filetype and upload_date columns in the attachment table.
     """
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -58,16 +57,28 @@ def init_db():
                 {', '.join([f"{f} TEXT" for f in EMPLOYEE_FIELDS])}
             )
         """)
+        # Add new columns if not exist (for upgrades)
         c.execute("""
             CREATE TABLE IF NOT EXISTS attachment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 employee_id INTEGER,
                 filename TEXT,
                 filepath TEXT,
+                filetype TEXT,
+                upload_date TEXT,
                 is_photo INTEGER DEFAULT 0,
                 FOREIGN KEY(employee_id) REFERENCES employee(id)
             )
         """)
+        # Try to add columns if missing (safe for existing DBs)
+        try:
+            c.execute("ALTER TABLE attachment ADD COLUMN filetype TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE attachment ADD COLUMN upload_date TEXT")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
         conn.close()
         if not os.path.exists(ATTACHMENTS_DIR):
@@ -101,6 +112,15 @@ def normalize_arabic(text: str) -> str:
         text = text.replace(src, target)
 
     return text.strip()
+
+def get_employee_folder(file_no):
+    """
+    Returns the path to the employee's attachment folder based on file_no.
+    """
+    folder = os.path.join(ATTACHMENTS_DIR, str(file_no))
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    return folder
 
 class MasarMainWindow(QMainWindow):
     def __init__(self):
@@ -328,18 +348,23 @@ class EmployeeTab(QWidget):
         """
         Opens a file dialog for selecting files to upload as attachments for the selected employee.
 
-        For each selected file, copies it to the attachments directory and adds an item to the
+        For each selected file, copies it to the employee's folder in the attachments directory and adds an item to the
         attachments list widget. Also appends the file record to the attachments attribute.
         If the selected employee ID is not None, inserts a new record into the attachment table
-        with the selected employee ID, filename, filepath, and is_photo set to 0.
+        with the selected employee ID, filename, filepath, filetype, upload_date, and is_photo set to 0.
 
         :return: None
         :rtype: NoneType
         """
         files, _ = QFileDialog.getOpenFileNames(self, "اختر ملفات")
+        file_no = self.form_fields["file_no"].text()
+        if not file_no:
+            QMessageBox.critical(self, "خطأ", "يرجى إدخال رقم الملف أولاً")
+            return
+        emp_folder = get_employee_folder(file_no)
         for f in files:
             fname = os.path.basename(f)
-            dest = os.path.join(ATTACHMENTS_DIR, fname)
+            dest = os.path.join(emp_folder, fname)
             if not os.path.exists(dest):
                 try:
                     with open(f, "rb") as src, open(dest, "wb") as dst:
@@ -350,36 +375,49 @@ class EmployeeTab(QWidget):
             self.attachments.append((fname, dest))
             # Save to DB if editing existing employee
             if self.selected_emp_id:
+                filetype, _ = mimetypes.guess_type(dest)
+                upload_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 c = self.conn.cursor()
-                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                          (self.selected_emp_id, fname, dest, 0))
+                c.execute(
+                    "INSERT INTO attachment (employee_id, filename, filepath, filetype, upload_date, is_photo) VALUES (?, ?, ?, ?, ?, ?)",
+                    (self.selected_emp_id, fname, dest, filetype or '', upload_date, 0)
+                )
                 self.conn.commit()
 
     def upload_photo(self):
         """
         Opens a file dialog for selecting a photo to upload as an attachment for the selected employee.
 
-        If a file is selected, copies it to the attachments directory and sets the photo path attribute.
+        If a file is selected, copies it to the employee's folder in the attachments directory and sets the photo path attribute.
         Then calls the display_photo method to display the photo in the photo label.
         If the selected employee ID is not None, inserts a new record into the attachment table
-        with the selected employee ID, filename, filepath, and is_photo set to 1.
+        with the selected employee ID, filename, filepath, filetype, upload_date, and is_photo set to 1.
 
         :return: None
         :rtype: NoneType
         """
         f, _ = QFileDialog.getOpenFileName(self, "اختر صورة شخصية", "", "Images (*.png *.jpg *.jpeg)")
         if f:
+            file_no = self.form_fields["file_no"].text()
+            if not file_no:
+                QMessageBox.critical(self, "خطأ", "يرجى إدخال رقم الملف أولاً")
+                return
+            emp_folder = get_employee_folder(file_no)
             fname = "photo_" + os.path.basename(f)
-            dest = os.path.join(ATTACHMENTS_DIR, fname)
+            dest = os.path.join(emp_folder, fname)
             with open(f, "rb") as src, open(dest, "wb") as dst:
                 dst.write(src.read())
             self.photo_path = dest
             self.display_photo()
             # Save to DB if editing existing employee
             if self.selected_emp_id:
+                filetype, _ = mimetypes.guess_type(dest)
+                upload_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 c = self.conn.cursor()
-                c.execute("INSERT INTO attachment (employee_id, filename, filepath, is_photo) VALUES (?, ?, ?, ?)",
-                          (self.selected_emp_id, fname, dest, 1))
+                c.execute(
+                    "INSERT INTO attachment (employee_id, filename, filepath, filetype, upload_date, is_photo) VALUES (?, ?, ?, ?, ?, ?)",
+                    (self.selected_emp_id, fname, dest, filetype or '', upload_date, 1)
+                )
                 self.conn.commit()
 
     def add_employee(self):
@@ -614,7 +652,7 @@ class ReportTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 11px;
+                    font-size: 10px;
                 }}
                 table {{
                     border-collapse: collapse;
