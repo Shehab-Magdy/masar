@@ -221,6 +221,7 @@ class EmployeeTab(QWidget):
         self.table.setHorizontalHeaderLabels([AR_LABELS[f] for f in EMPLOYEE_FIELDS])
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.cellClicked.connect(self.on_row_select)
+        self.table.setSortingEnabled(True)  # <-- Enable sorting by clicking headers
         main_layout.addWidget(self.table)
         form_layout = QFormLayout()
         self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
