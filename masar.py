@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
 import re
+import shutil
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -612,10 +613,11 @@ class EmployeeTab(QWidget):
 
     def delete_employee(self):
         """
-        Deletes the selected employee from the database.
+        Deletes the selected employee from the database and removes their attachments folder from disk.
 
         If the selected employee ID is not None, prompts the user to confirm deletion.
         If the user confirms, deletes the employee record from the employee table and all attachments of the selected employee from the attachment table.
+        Also deletes the employee's attachments folder from disk.
         Finally, commits the changes, reloads the employees, clears the form, and shows an information message box with a success message.
         """
         if not self.selected_emp_id:
@@ -623,13 +625,23 @@ class EmployeeTab(QWidget):
             return
         reply = QMessageBox.question(self, "تأكيد", "هل أنت متأكد من حذف الموظف؟", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+            # Get file_no before deleting the employee
+            file_no = self.form_fields["file_no"].text().strip()
             c = self.conn.cursor()
             c.execute("DELETE FROM employee WHERE id=?", (self.selected_emp_id,))
             c.execute("DELETE FROM attachment WHERE employee_id=?", (self.selected_emp_id,))
             self.conn.commit()
+            # Delete the employee's folder and all its contents
+            if file_no:
+                emp_folder = get_employee_folder(file_no)
+                if os.path.exists(emp_folder):
+                    try:
+                        shutil.rmtree(emp_folder)
+                    except Exception as e:
+                        print(f"Error deleting folder {emp_folder}: {e}")
             self.load_employees()
             self.clear_form()
-            QMessageBox.information(self, "تم", "تم حذف الموظف")
+            QMessageBox.information(self, "تم", "تم حذف الموظف وجميع ملفاته بنجاح")
 
     def clear_form(self):
         """
