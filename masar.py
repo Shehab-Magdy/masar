@@ -228,9 +228,14 @@ class EmployeeTab(QWidget):
             form_layout.addRow(AR_LABELS[f], self.form_fields[f])
         self.attach_list = QListWidget()
         form_layout.addRow(AR_LABELS["attachments"], self.attach_list)
+        attach_btns_layout = QHBoxLayout()
         self.btn_attach = QPushButton("رفع ملفات")
         self.btn_attach.clicked.connect(self.upload_files)
-        form_layout.addRow(self.btn_attach)
+        attach_btns_layout.addWidget(self.btn_attach)
+        self.btn_delete_attachment = QPushButton("حذف ملف")
+        self.btn_delete_attachment.clicked.connect(self.delete_attachment)
+        attach_btns_layout.addWidget(self.btn_delete_attachment)
+        form_layout.addRow(attach_btns_layout)
         self.btn_photo = QPushButton("رفع صورة")
         self.btn_photo.clicked.connect(self.upload_photo)
         form_layout.addRow(AR_LABELS["personal_photo"], self.btn_photo)
@@ -256,6 +261,7 @@ class EmployeeTab(QWidget):
         layout.addLayout(main_layout)
         self.setLayout(layout)
         self.load_employees()
+
 
     def load_employees(self):
         """
@@ -351,7 +357,7 @@ class EmployeeTab(QWidget):
         """
         # Find the file path for the selected item
         fname = item.text()
-        for name, path in self.attachments:
+        for name, path, _ in self.attachments:
             if name == fname and os.path.exists(path):
                 if sys.platform.startswith('darwin'):
                     os.system(f'open "{path}"')
@@ -698,6 +704,48 @@ class EmployeeTab(QWidget):
             for col_idx, val in enumerate(row[1:]):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(val)))
             self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
+
+    def delete_attachment(self):
+        """
+        Deletes the selected attachment from the attachments list, database, and disk.
+        """
+        selected_items = self.attach_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار مرفق للحذف")
+            return
+        item = selected_items[0]
+        fname = item.text()
+        # Find the attachment tuple
+        for att in self.attachments:
+            if att[0] == fname:
+                fpath = att[1]
+                break
+        else:
+            QMessageBox.warning(self, "تنبيه", "لم يتم العثور على الملف")
+            return
+
+        reply = QMessageBox.question(self, "تأكيد", f"هل أنت متأكد من حذف المرفق '{fname}'؟", QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        # Remove from DB if employee is saved
+        if self.selected_emp_id:
+            c = self.conn.cursor()
+            c.execute("DELETE FROM attachment WHERE employee_id=? AND filename=?", (self.selected_emp_id, fname))
+            self.conn.commit()
+        # Remove from disk
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception as e:
+                print(f"Error deleting file {fpath}: {e}")
+        # Remove from attachments list and UI
+        self.attachments = [att for att in self.attachments if att[0] != fname]
+        self.attach_list.takeItem(self.attach_list.row(item))
+        # If it was the photo, clear photo
+        if hasattr(self, "photo_path") and fpath == self.photo_path:
+            self.photo_path = None
+            self.display_photo()
 
 class ReportTab(QWidget):
     def __init__(self, conn):
