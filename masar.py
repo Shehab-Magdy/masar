@@ -483,6 +483,7 @@ class EmployeeTab(QWidget):
         name = self.form_fields["name"].text().strip()
         file_no = self.form_fields["file_no"].text().strip()
         national_id = self.form_fields["national_id"].text().strip()
+        insurance_no = self.form_fields["insurance_no"].text().strip()
         phone = self.form_fields["phone"].text().strip()
         date_fields = ["grade_date", "hire_date", "birth_date"]
 
@@ -490,9 +491,11 @@ class EmployeeTab(QWidget):
         if not name:
             return False, "يرجى إدخال الاسم"
 
-        # رقم الملف: مطلوب وفريد
+        # رقم الملف: مطلوب وفريد ويجب أن يكون رقم صحيح
         if not file_no:
             return False, "يرجى إدخال رقم الملف"
+        if not file_no.isdigit():
+            return False, "رقم الملف يجب أن يكون أرقام فقط"
         c = self.conn.cursor()
         if skip_id:
             c.execute("SELECT id FROM employee WHERE file_no=? AND id!=?", (file_no, skip_id))
@@ -512,6 +515,10 @@ class EmployeeTab(QWidget):
             c.execute("SELECT id FROM employee WHERE national_id=?", (national_id,))
         if c.fetchone():
             return False, "هذا الرقم القومي مسجل بالفعل."
+
+        # الرقم التأمينى: إذا أدخل يجب أن يكون أرقام فقط
+        if insurance_no and not insurance_no.isdigit():
+            return False, "الرقم التأميني يجب أن يحتوي على أرقام فقط"
 
         # رقم الهاتف: اختياري، لكن إذا أدخل يجب أن يكون أرقام فقط
         if phone and not phone.isdigit():
