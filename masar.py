@@ -153,14 +153,6 @@ class MasarMainWindow(QMainWindow):
 
 class DashboardTab(QWidget):
     def __init__(self, conn):
-        """
-        Initializes the dashboard tab.
-
-        Sets the window title and layout. It also refreshes the counts of employees, departments, and attachments.
-
-        :param conn: The database connection.
-        :type conn: sqlite3.Connection
-        """
         super().__init__()
         self.conn = conn
         layout = QVBoxLayout()
@@ -170,23 +162,36 @@ class DashboardTab(QWidget):
         self.lbl_emp = QLabel()
         self.lbl_dept = QLabel()
         self.lbl_att = QLabel()
-        self.lbl_retire_this_year = QLabel()  # New label for retirement stats
+        self.lbl_retire_this_year = QLabel()
         layout.addWidget(self.lbl_emp)
         layout.addWidget(self.lbl_dept)
         layout.addWidget(self.lbl_att)
-        layout.addWidget(self.lbl_retire_this_year)  # Add to layout
+        layout.addWidget(self.lbl_retire_this_year)
+
+        # --- Add table for employees retiring this year ---
+        # self.retire_table = QTableWidget()
+        # self.retire_table.setColumnCount(2)
+        # self.retire_table.setHorizontalHeaderLabels(["الاسم", "رقم الملف"])
+        # self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
+        # self.retire_table.setSortingEnabled(False)
+        # layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
+        # layout.addWidget(self.retire_table)
+
+        # --- Add refresh and print buttons side by side ---
+        btns_layout = QHBoxLayout()
         self.btn_refresh = QPushButton("تحديث")
         self.btn_refresh.clicked.connect(self.refresh_counts)
-        layout.addWidget(self.btn_refresh)
+        btns_layout.addWidget(self.btn_refresh)
+        self.btn_print_retire = QPushButton("تصدير الموظفون الذين تاريخ معاشهم في هذا العام كـ PDF")
+        self.btn_print_retire.clicked.connect(self.export_retire_pdf)
+        btns_layout.addWidget(self.btn_print_retire)
+        layout.addLayout(btns_layout)
+
         self.setLayout(layout)
         self.refresh_counts()
 
     def refresh_counts(self):
-        """
-        Refreshes the counts of employees, departments, and attachments on the dashboard tab.
-
-        Queries the database to get the counts and updates the labels accordingly.
-        """
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) FROM employee")
         emp_count = c.fetchone()[0]
@@ -194,7 +199,6 @@ class DashboardTab(QWidget):
         dept_count = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM attachment")
         att_count = c.fetchone()[0]
-        # Count employees whose retirement_date is in the current year
         current_year = datetime.date.today().year
         c.execute("""
             SELECT COUNT(*) FROM employee
@@ -207,6 +211,129 @@ class DashboardTab(QWidget):
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
         self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
         self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
+
+        # --- Fill the retire_table with employees retiring this year ---
+        # self.retire_table.setRowCount(0)
+        # c.execute("""
+        #     SELECT name, file_no FROM employee
+        #     WHERE retirement_date IS NOT NULL
+        #       AND retirement_date != ''
+        #       AND substr(retirement_date, 1, 4) = ?
+        # """, (str(current_year),))
+        # for row_idx, (name, file_no) in enumerate(c.fetchall()):
+        #     self.retire_table.insertRow(row_idx)
+        #     self.retire_table.setItem(row_idx, 0, QTableWidgetItem(str(name)))
+        #     self.retire_table.setItem(row_idx, 1, QTableWidgetItem(str(file_no)))
+
+    def export_retire_pdf(self):
+        """
+        Export the full data of employees whose retirement date is in the current year as a PDF,
+        using the same format and order as export_filtered_pdf.
+        """
+        # Prepare headers and get current year
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        current_year = datetime.date.today().year
+
+        # Query all fields for employees retiring this year
+        c = self.conn.cursor()
+        c.execute(f"""
+            SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee
+            WHERE retirement_date IS NOT NULL
+              AND retirement_date != ''
+              AND substr(retirement_date, 1, 4) = ?
+        """, (str(current_year),))
+        rows = c.fetchall()
+
+        if not rows:
+            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
+            return
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        default_name = f"Employees_Retirement_{now}.pdf"
+
+        # Define int fields for column width
+        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
+
+        # Build colgroup for column widths
+        colgroup = "<colgroup>"
+        for f in EMPLOYEE_FIELDS[::-1]:
+            if f in int_fields:
+                colgroup += '<col style="width:8%;">'
+            else:
+                colgroup += '<col style="width:auto;">'
+        colgroup += "</colgroup>"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ قائمة المعاش كـ PDF",
+            default_name,
+            "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        html = f"""
+        <html lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @font-face {{
+                    font-family: 'Amiri';
+                    src: url('Amiri-Regular.ttf');
+                }}
+                body {{
+                    direction: ltr;
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: 10px;
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    table-layout: fixed;
+                }}
+                th, td {{
+                    border: 1px solid #888;
+                    padding: 6px 4px;
+                    word-break: break-word;
+                    vertical-align: top;
+                    text-align: right;
+                }}
+                th {{
+                    background: #b3d1f7;
+                }}
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align:center;">تقرير الموظفين الذين تاريخ معاشهم في هذا العام</h2>
+            <table dir="ltr">
+                {colgroup}
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        for row in rows:
+            html += "<tr>"
+            for cell in row[::-1]:
+                html += f"<td>{cell if cell else ''}</td>"
+            html += "</tr>"
+        html += """
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+
+        try:
+            css = CSS(string='''
+                @page { size: A4 landscape; margin: 1cm; }
+            ''')
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير القائمة بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير القائمة: {e}")
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
