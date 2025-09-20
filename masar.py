@@ -228,10 +228,14 @@ class DashboardTab(QWidget):
     def export_retire_pdf(self):
         """
         Export the full data of employees whose retirement date is in the current year as a PDF,
-        using the same format and order as export_filtered_pdf.
+        using the same split-header, 9-columns-per-row, two-rows-per-employee design as export_filtered_pdf/export_pdf.
         """
         # Prepare headers and get current year
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        half = 9
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        headers1 = [AR_LABELS[f] for f in fields1]
+        headers2 = [AR_LABELS[f] for f in fields2]
         current_year = datetime.date.today().year
 
         # Query all fields for employees retiring this year
@@ -250,19 +254,6 @@ class DashboardTab(QWidget):
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_Retirement_{now}.pdf"
-
-        # Define int fields for column width
-        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
-
-        # Build colgroup for column widths
-        colgroup = "<colgroup>"
-        for f in EMPLOYEE_FIELDS[::-1]:
-            if f in int_fields:
-                colgroup += '<col style="width:8%;">'
-            else:
-                colgroup += '<col style="width:auto;">'
-        colgroup += "</colgroup>"
-
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "حفظ قائمة المعاش كـ PDF",
@@ -282,14 +273,14 @@ class DashboardTab(QWidget):
                     src: url('Amiri-Regular.ttf');
                 }}
                 body {{
-                    direction: ltr;
+                    direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 10px;
+                    font-size: 11px;
                 }}
                 table {{
                     border-collapse: collapse;
                     width: 100%;
-                    table-layout: fixed;
+                    margin-bottom: 20px;
                 }}
                 th, td {{
                     border: 1px solid #888;
@@ -301,24 +292,53 @@ class DashboardTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                tr:nth-child(odd) {{
+                    background-color: #ffffff;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f2f2f2;
+                }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
             </style>
         </head>
         <body>
             <h2 style="text-align:center;">تقرير الموظفين الذين تاريخ معاشهم في هذا العام</h2>
-            <table dir="ltr">
-                {colgroup}
+            <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
+                        {''.join(f'<th>{h}</th>' for h in headers1)}
+                    </tr>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers2)}
                     </tr>
                 </thead>
                 <tbody>
         """
-        for row in rows:
-            html += "<tr>"
-            for cell in row[::-1]:
-                html += f"<td>{cell if cell else ''}</td>"
-            html += "</tr>"
+
+        for idx, emp in enumerate(rows):
+            row_class = "" if idx % 2 == 0 else "row-alt"
+            # First row: first 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+            # Second row: next 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half, half*2):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+
         html += """
                 </tbody>
             </table>
@@ -933,10 +953,12 @@ class EmployeeTab(QWidget):
 
     def export_filtered_pdf(self):
         """
-        Exports the currently filtered list of employees in the table as a PDF, using the same format as the main report.
+        Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
+        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
+        - First row: first 9 fields (with labels)
+        - Second row: next 9 fields (with labels)
         """
         # Gather data from the table (only visible/filtered rows)
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
         rows = []
         for row_idx in range(self.table.rowCount()):
             row = []
@@ -949,23 +971,14 @@ class EmployeeTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
             return
 
-        # Generate default file name with current date and time
+        half = 9
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        headers1 = [AR_LABELS[f] for f in fields1]
+        headers2 = [AR_LABELS[f] for f in fields2]
+
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        default_name = f"Employees_Filtered_{now}.pdf"
-
-        # Define int fields for column width
-        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
-
-        # Build colgroup for column widths
-        colgroup = "<colgroup>"
-        for f in EMPLOYEE_FIELDS[::-1]:
-            if f in int_fields:
-                colgroup += '<col style="width:8%;">'
-            else:
-                colgroup += '<col style="width:auto;">'
-        colgroup += "</colgroup>"
-
-        # Ask user for file location
+        default_name = f"Employees_{now}.pdf"
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "حفظ النتائج كـ PDF",
@@ -975,115 +988,6 @@ class EmployeeTab(QWidget):
         if not file_path:
             return
 
-        # Build HTML table with RTL and Arabic font
-        html = f"""
-        <html lang="ar">
-        <head>
-            <meta charset="utf-8">
-            <style>
-                @font-face {{
-                    font-family: 'Amiri';
-                    src: url('Amiri-Regular.ttf');
-                }}
-                body {{
-                    direction: ltr;
-                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 10px;
-                }}
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    table-layout: fixed;
-                }}
-                th, td {{
-                    border: 1px solid #888;
-                    padding: 6px 4px;
-                    word-break: break-word;
-                    vertical-align: top;
-                    text-align: right;
-                }}
-                th {{
-                    background: #b3d1f7;
-                }}
-            </style>
-        </head>
-        <body>
-            <h2 style="text-align:center;">تقرير الموظفين (حسب البحث)</h2>
-            <table dir="ltr">
-                {colgroup}
-                <thead>
-                    <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        for row in rows:
-            html += "<tr>"
-            for cell in row[::-1]:
-                html += f"<td>{cell if cell else ''}</td>"
-            html += "</tr>"
-        html += """
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
-
-        # Save HTML to PDF using WeasyPrint
-        try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
-            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
-            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
-
-    def export_pdf(self):
-        """
-        Exports the full report as a landscape A4 PDF, one employee per row, wrapped cells, Arabic support, RTL using WeasyPrint.
-
-        Retrieves all employee records from the database, generates a default file name with the current date and time,
-        asks the user for a file location using a file dialog, builds an HTML table with RTL and Arabic font, then saves the HTML to a PDF file using WeasyPrint.
-
-        Shows an information message box with a success message if the export is successful, or a critical message box with an error message if an exception occurs during the export process.
-
-        :return: None
-        :rtype: NoneType
-        """
-        c = self.conn.cursor()
-        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
-        rows = c.fetchall()
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-
-        # Generate default file name with current date and time
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        default_name = f"Employees {now}.pdf"
-
-        # Define int fields for column width
-        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
-
-        # Build colgroup for column widths
-        colgroup = "<colgroup>"
-        for f in EMPLOYEE_FIELDS[::-1]:
-            if f in int_fields:
-                colgroup += '<col style="width:8%;">'
-            else:
-                colgroup += '<col style="width:auto;">'
-        colgroup += "</colgroup>"
-
-        # Ask user for file location
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "حفظ التقرير كـ PDF",
-            default_name,
-            "PDF Files (*.pdf)"
-        )
-        if not file_path:
-            return
-
-        # Build HTML table with RTL and Arabic font
         html = f"""
         <html lang="ar">
         <head>
@@ -1096,12 +1000,12 @@ class EmployeeTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 10px;
+                    font-size: 11px;
                 }}
                 table {{
                     border-collapse: collapse;
                     width: 100%;
-                    table-layout: fixed;
+                    margin-bottom: 20px;
                 }}
                 th, td {{
                     border: 1px solid #888;
@@ -1113,24 +1017,53 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                tr:nth-child(odd) {{
+                    background-color: #ffffff;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f2f2f2;
+                }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
             </style>
         </head>
         <body>
             <h2 style="text-align:center;">تقرير الموظفين</h2>
-            <table dir="ltr">
-                {colgroup}
+            <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
+                        {''.join(f'<th>{h}</th>' for h in headers1)}
+                    </tr>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers2)}
                     </tr>
                 </thead>
                 <tbody>
         """
-        for row in rows:
-            html += "<tr>"
-            for cell in row[::-1]:
-                html += f"<td>{cell if cell else ''}</td>"
-            html += "</tr>"
+
+        for idx, emp in enumerate(rows):
+            row_class = "" if idx % 2 == 0 else "row-alt"
+            # First row: first 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+            # Second row: next 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half, half*2):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+
         html += """
                 </tbody>
             </table>
@@ -1138,7 +1071,128 @@ class EmployeeTab(QWidget):
         </html>
         """
 
-        # Save HTML to PDF using WeasyPrint
+        try:
+            css = CSS(string='''
+                @page { size: A4 landscape; margin: 1cm; }
+            ''')
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
+
+    def export_pdf(self):
+        """
+        Exports all employees as a printable PDF report using WeasyPrint.
+        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
+        - First row: first 9 fields (with labels)
+        - Second row: next 9 fields (with labels)
+        """
+        c = self.conn.cursor()
+        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
+        employees = c.fetchall()
+        if not employees:
+            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
+            return
+
+        half = 9
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        headers1 = [AR_LABELS[f] for f in fields1]
+        headers2 = [AR_LABELS[f] for f in fields2]
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ التقرير كـ PDF",
+            f"employees_report_{now}.pdf",
+            "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        html = f"""
+        <html lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @font-face {{
+                    font-family: 'Amiri';
+                    src: url('Amiri-Regular.ttf');
+                }}
+                body {{
+                    direction: rtl;
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: 11px;
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin-bottom: 20px;
+                }}
+                th, td {{
+                    border: 1px solid #888;
+                    padding: 6px 4px;
+                    word-break: break-word;
+                    vertical-align: top;
+                    text-align: right;
+                }}
+                th {{
+                    background: #b3d1f7;
+                }}
+                tr:nth-child(odd) {{
+                    background-color: #ffffff;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f2f2f2;
+                }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align:center;">تقرير الموظفين</h2>
+            <table dir="rtl">
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers1)}
+                    </tr>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers2)}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for idx, emp in enumerate(employees):
+            row_class = "" if idx % 2 == 0 else "row-alt"
+            # First row: first 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+            # Second row: next 9 fields
+            html += f'<tr class="{row_class}">'
+            for i in range(half, half*2):
+                val = emp[i] if i < len(emp) and emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
+
+        html += """
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+
         try:
             css = CSS(string='''
                 @page { size: A4 landscape; margin: 1cm; }
