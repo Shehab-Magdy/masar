@@ -170,9 +170,11 @@ class DashboardTab(QWidget):
         self.lbl_emp = QLabel()
         self.lbl_dept = QLabel()
         self.lbl_att = QLabel()
+        self.lbl_retire_this_year = QLabel()  # New label for retirement stats
         layout.addWidget(self.lbl_emp)
         layout.addWidget(self.lbl_dept)
         layout.addWidget(self.lbl_att)
+        layout.addWidget(self.lbl_retire_this_year)  # Add to layout
         self.btn_refresh = QPushButton("تحديث")
         self.btn_refresh.clicked.connect(self.refresh_counts)
         layout.addWidget(self.btn_refresh)
@@ -192,9 +194,19 @@ class DashboardTab(QWidget):
         dept_count = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM attachment")
         att_count = c.fetchone()[0]
+        # Count employees whose retirement_date is in the current year
+        current_year = datetime.date.today().year
+        c.execute("""
+            SELECT COUNT(*) FROM employee
+            WHERE retirement_date IS NOT NULL
+              AND retirement_date != ''
+              AND substr(retirement_date, 1, 4) = ?
+        """, (str(current_year),))
+        retire_this_year = c.fetchone()[0]
         self.lbl_emp.setText(f"عدد الموظفين: {emp_count}")
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
         self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
+        self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
