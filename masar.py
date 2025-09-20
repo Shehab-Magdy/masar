@@ -5,7 +5,7 @@ import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QFormLayout, QSizePolicy
+    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
@@ -35,13 +35,14 @@ AR_LABELS = {
     "phone": "رقم التليفون",
     "notes": "ملاحظات",
     "attachments": "ملفات مرتبطة",
-    "personal_photo": "صورة شخصية"
+    "personal_photo": "صورة شخصية",
+    "retirement_date": "تاريخ المعاش"
 }
 
 EMPLOYEE_FIELDS = [
     "name", "grade", "grade_date", "hire_date", "file_no", "qualification",
     "functional_group", "type_group", "job_title", "department", "current_work",
-    "birth_date", "insurance_no", "national_id", "address", "phone", "notes"
+    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "notes"
 ]
 
 def init_db():
@@ -52,13 +53,18 @@ def init_db():
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
+        # Add retirement_date to the table creation
         c.execute(f"""
             CREATE TABLE IF NOT EXISTS employee (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 {', '.join([f"{f} TEXT" for f in EMPLOYEE_FIELDS])}
             )
         """)
-        # Add new columns if not exist (for upgrades)
+        # Try to add the column if missing (for upgrades)
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN retirement_date TEXT")
+        except sqlite3.OperationalError:
+            pass
         c.execute("""
             CREATE TABLE IF NOT EXISTS attachment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +77,7 @@ def init_db():
                 FOREIGN KEY(employee_id) REFERENCES employee(id)
             )
         """)
-        # Try to add columns if missing (safe for existing DBs)
+        # Try to add columns if not exist (for upgrades)
         try:
             c.execute("ALTER TABLE attachment ADD COLUMN filetype TEXT")
         except sqlite3.OperationalError:
@@ -223,28 +229,32 @@ class EmployeeTab(QWidget):
         self.table.setSortingEnabled(True)  # <-- Enable sorting by clicking headers
         main_layout.addWidget(self.table)
         
-        form_layout = QFormLayout()
-        form_layout.setFormAlignment(Qt.AlignRight)   # Align the whole form to the right
-        form_layout.setLabelAlignment(Qt.AlignRight)  # Align labels to the right
-        form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
-        form_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
-        
-        form_widget = QWidget()
-        form_widget.setLayout(form_layout)
-        form_widget.setLayoutDirection(Qt.RightToLeft)  # <-- set RTL on the widget
-        main_layout.addWidget(form_widget)
-        
+        # Replace the QFormLayout with a QGridLayout for two columns
+        grid_layout = QGridLayout()
+        grid_layout.setAlignment(Qt.AlignRight)
+        grid_layout.setHorizontalSpacing(12)
+        grid_layout.setVerticalSpacing(8)
+
         self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
-        for f in EMPLOYEE_FIELDS:
-            self.form_fields[f].setAlignment(Qt.AlignLeft)
-            self.form_fields[f].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # <-- Make textbox expand
-            label = QLabel(AR_LABELS[f])
-            label.setMinimumWidth(0)  # Remove any fixed width
-            label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-            form_layout.addRow(self.form_fields[f], label)
-        
         self.attach_list = QListWidget()
-        form_layout.addRow(self.attach_list, QLabel(AR_LABELS["attachments"]))
+        num_fields = len(EMPLOYEE_FIELDS)
+        fields_per_col = num_fields // 2 + num_fields % 2  # 9 if 18 fields
+
+        for idx, f in enumerate(EMPLOYEE_FIELDS):
+            row = idx % fields_per_col
+            col = (idx // fields_per_col) * 2  # 0 for first col, 2 for second col
+            label = QLabel(AR_LABELS[f])
+            label.setMinimumWidth(0)
+            label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+            self.form_fields[f].setAlignment(Qt.AlignLeft)
+            self.form_fields[f].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            grid_layout.addWidget(label, row, col)
+            grid_layout.addWidget(self.form_fields[f], row, col + 1)
+
+        # Attachments and buttons below the grid
+        row_offset = fields_per_col
+        grid_layout.addWidget(QLabel(AR_LABELS["attachments"]), row_offset, 0)
+        grid_layout.addWidget(self.attach_list, row_offset, 1, 1, 3)
         attach_btns_layout = QHBoxLayout()
         self.btn_attach = QPushButton("رفع ملفات")
         self.btn_attach.clicked.connect(self.upload_files)
@@ -252,14 +262,17 @@ class EmployeeTab(QWidget):
         self.btn_delete_attachment = QPushButton("حذف ملف")
         self.btn_delete_attachment.clicked.connect(self.delete_attachment)
         attach_btns_layout.addWidget(self.btn_delete_attachment)
-        form_layout.addRow(attach_btns_layout)
-        
+        grid_layout.addLayout(attach_btns_layout, row_offset + 1, 1, 1, 3)
+
+        # Photo upload and label
+        grid_layout.addWidget(QLabel(AR_LABELS["personal_photo"]), row_offset + 2, 0)
         self.btn_photo = QPushButton("رفع صورة")
         self.btn_photo.clicked.connect(self.upload_photo)
-        form_layout.addRow(AR_LABELS["personal_photo"], self.btn_photo)
+        grid_layout.addWidget(self.btn_photo, row_offset + 2, 1)
         self.photo_label = QLabel()
-        form_layout.addRow(self.photo_label)
-        
+        grid_layout.addWidget(self.photo_label, row_offset + 2, 2)
+
+        # Action buttons
         btns_layout = QHBoxLayout()
         self.btn_add = QPushButton("إضافة")
         self.btn_add.clicked.connect(self.add_employee)
@@ -273,13 +286,15 @@ class EmployeeTab(QWidget):
         self.btn_clear = QPushButton("مسح")
         self.btn_clear.clicked.connect(self.clear_form)
         btns_layout.addWidget(self.btn_clear)
-        form_layout.addRow(btns_layout)
         # Add a button for printing/exporting the filtered list
         self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
         self.btn_export_filtered.clicked.connect(self.export_filtered_pdf)
-        form_layout.addRow(self.btn_export_filtered)
+        btns_layout.addWidget(self.btn_export_filtered)
+        grid_layout.addLayout(btns_layout, row_offset + 3, 0, 1, 4)
+
         form_widget = QWidget()
-        form_widget.setLayout(form_layout)
+        form_widget.setLayout(grid_layout)
+        form_widget.setLayoutDirection(Qt.RightToLeft)
         main_layout.addWidget(form_widget)
         layout.addLayout(main_layout)
         self.setLayout(layout)
@@ -515,6 +530,13 @@ class EmployeeTab(QWidget):
         insurance_no = self.form_fields["insurance_no"].text().strip()
         phone = self.form_fields["phone"].text().strip()
         date_fields = ["grade_date", "hire_date", "birth_date"]
+        # Add retirement_date for format validation only
+        retirement_date_str = self.form_fields["retirement_date"].text().strip()
+        if retirement_date_str:
+            try:
+                datetime.datetime.strptime(retirement_date_str, "%Y-%m-%d")
+            except Exception:
+                return False, f"صيغة التاريخ غير صحيحة في {AR_LABELS['retirement_date']} (يرجى استخدام YYYY-MM-DD)"
 
         # الاسم: مطلوب
         if not name:
