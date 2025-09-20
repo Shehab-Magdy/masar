@@ -5,13 +5,12 @@ import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QFormLayout
+    QMessageBox, QTextEdit, QFormLayout, QSizePolicy
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
-import re
 import shutil
 
 DB_FILE = "masar.db"
@@ -142,7 +141,7 @@ class MasarMainWindow(QMainWindow):
         self.conn = sqlite3.connect(DB_FILE)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
-        self.tabs.addTab(DashboardTab(self.conn), "لوحة التحكم")
+        self.tabs.addTab(DashboardTab(self.conn), "الإحصائيات")
         self.tabs.addTab(EmployeeTab(self.conn), "الموظفين")
 
 
@@ -159,7 +158,7 @@ class DashboardTab(QWidget):
         super().__init__()
         self.conn = conn
         layout = QVBoxLayout()
-        self.lbl_title = QLabel("لوحة التحكم")
+        self.lbl_title = QLabel("الإحصائيات")
         self.lbl_title.setStyleSheet("font-size:24px; font-weight:bold; color:#1976d2;")
         layout.addWidget(self.lbl_title)
         self.lbl_emp = QLabel()
@@ -189,7 +188,7 @@ class DashboardTab(QWidget):
         att_count = c.fetchone()[0]
         self.lbl_emp.setText(f"عدد الموظفين: {emp_count}")
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
-        self.lbl_att.setText(f"عدد الملفات المرتبطة: {att_count}")
+        self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
@@ -212,8 +211,8 @@ class EmployeeTab(QWidget):
         self.search_field = QLineEdit()
         self.search_field.setPlaceholderText("بحث بالاسم أو القسم أو الرقم القومى أو رقم الملف...")
         self.search_field.textChanged.connect(lambda: self.search_employees(self.search_field.text()))
-        search_layout.addWidget(QLabel("بحث:"))
         search_layout.addWidget(self.search_field)
+        search_layout.addWidget(QLabel("بحث:"))
         layout.addLayout(search_layout)
         main_layout = QHBoxLayout()
         self.table = QTableWidget()
@@ -223,12 +222,29 @@ class EmployeeTab(QWidget):
         self.table.cellClicked.connect(self.on_row_select)
         self.table.setSortingEnabled(True)  # <-- Enable sorting by clicking headers
         main_layout.addWidget(self.table)
+        
         form_layout = QFormLayout()
+        form_layout.setFormAlignment(Qt.AlignRight)   # Align the whole form to the right
+        form_layout.setLabelAlignment(Qt.AlignRight)  # Align labels to the right
+        form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        form_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        
+        form_widget = QWidget()
+        form_widget.setLayout(form_layout)
+        form_widget.setLayoutDirection(Qt.RightToLeft)  # <-- set RTL on the widget
+        main_layout.addWidget(form_widget)
+        
         self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
         for f in EMPLOYEE_FIELDS:
-            form_layout.addRow(AR_LABELS[f], self.form_fields[f])
+            self.form_fields[f].setAlignment(Qt.AlignLeft)
+            self.form_fields[f].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # <-- Make textbox expand
+            label = QLabel(AR_LABELS[f])
+            label.setMinimumWidth(0)  # Remove any fixed width
+            label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+            form_layout.addRow(self.form_fields[f], label)
+        
         self.attach_list = QListWidget()
-        form_layout.addRow(AR_LABELS["attachments"], self.attach_list)
+        form_layout.addRow(self.attach_list, QLabel(AR_LABELS["attachments"]))
         attach_btns_layout = QHBoxLayout()
         self.btn_attach = QPushButton("رفع ملفات")
         self.btn_attach.clicked.connect(self.upload_files)
@@ -237,11 +253,13 @@ class EmployeeTab(QWidget):
         self.btn_delete_attachment.clicked.connect(self.delete_attachment)
         attach_btns_layout.addWidget(self.btn_delete_attachment)
         form_layout.addRow(attach_btns_layout)
+        
         self.btn_photo = QPushButton("رفع صورة")
         self.btn_photo.clicked.connect(self.upload_photo)
         form_layout.addRow(AR_LABELS["personal_photo"], self.btn_photo)
         self.photo_label = QLabel()
         form_layout.addRow(self.photo_label)
+        
         btns_layout = QHBoxLayout()
         self.btn_add = QPushButton("إضافة")
         self.btn_add.clicked.connect(self.add_employee)
