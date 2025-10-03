@@ -1,5 +1,7 @@
      {
        "contrast": 80,
        "brightness": 70,
-       "opacity": 50
+       "opacity": 50,
+       "firstLineHeader": "السطر الاول فى رأس التقرير ",
+       "secondLineHeader": "السطر الثانى فى رأس التقرير "
      }

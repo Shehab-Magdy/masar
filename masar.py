@@ -273,8 +273,20 @@ class DashboardTab(QWidget):
         
         # Prepare background image as base64 (only if file and config exist and are valid)
         bg_url = None
+        first_line_header = ""
+        second_line_header = ""
         bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
         cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
@@ -367,9 +379,17 @@ class DashboardTab(QWidget):
         """
 
         try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير القائمة بنجاح كملف PDF.")
         except Exception as e:
@@ -1019,8 +1039,20 @@ class EmployeeTab(QWidget):
         
         # Prepare background image as base64 (only if file and config exist and are valid)
         bg_url = None
+        first_line_header = ""
+        second_line_header = ""
         bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
         cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
@@ -1110,9 +1142,17 @@ class EmployeeTab(QWidget):
         """
 
         try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
         except Exception as e:
@@ -1152,6 +1192,18 @@ class EmployeeTab(QWidget):
         bg_url = None
         bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
         cfg_path = os.path.join(os.getcwd(), 'config.json')
+        first_line_header = ""
+        second_line_header = ""
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
@@ -1244,9 +1296,17 @@ class EmployeeTab(QWidget):
         """
 
         try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '{first_line_header.replace("'", "\\'")}\\A{second_line_header.replace("'", "\\'")}';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير التقرير بنجاح كملف PDF.")
         except Exception as e:
