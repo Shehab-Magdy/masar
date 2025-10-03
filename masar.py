@@ -12,6 +12,8 @@ from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
 import shutil
+import base64
+from pdf_bg_utils import process_bg_image
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -268,7 +270,18 @@ class DashboardTab(QWidget):
         )
         if not file_path:
             return
-
+        
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
         html = f"""
         <html lang="ar">
         <head>
@@ -282,6 +295,7 @@ class DashboardTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 11px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -1002,7 +1016,18 @@ class EmployeeTab(QWidget):
         )
         if not file_path:
             return
-
+        
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
         html = f"""
         <html lang="ar">
         <head>
@@ -1016,6 +1041,7 @@ class EmployeeTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 11px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -1122,6 +1148,17 @@ class EmployeeTab(QWidget):
         if not file_path:
             return
 
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
         html = f"""
         <html lang="ar">
         <head>
@@ -1135,6 +1172,7 @@ class EmployeeTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 11px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
