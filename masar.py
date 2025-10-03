@@ -244,6 +244,7 @@ class DashboardTab(QWidget):
         fields2 = EMPLOYEE_FIELDS[half:]
         headers1 = [AR_LABELS[f] for f in fields1]
         headers2 = [AR_LABELS[f] for f in fields2]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
         current_year = datetime.date.today().year
 
         # Query all fields for employees retiring this year
@@ -306,7 +307,7 @@ class DashboardTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 11px;
+                    font-size: 9px;
                     {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
@@ -347,29 +348,17 @@ class DashboardTab(QWidget):
             <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers1)}
-                    </tr>
-                    <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers2)}
+                        {''.join(f'<th>{h}</th>' for h in headers)}
                     </tr>
                 </thead>
                 <tbody>
         """
 
-        for idx, emp in enumerate(rows):
-            row_class = "" if idx % 2 == 0 else "row-alt"
-            # First row: first 9 fields
-            html += f'<tr class="{row_class}">'
-            for i in range(half):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
-            # Second row: next 9 fields
-            html += f'<tr class="{row_class}">'
-            for i in range(half, half*2):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
+        for idx, emp in enumerate(rows):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
 
         html += """
                 </tbody>
@@ -1025,6 +1014,8 @@ class EmployeeTab(QWidget):
         # Add serial number to the first column in PDF only
         headers1 = [AR_LABELS["serial"]] + [AR_LABELS[f] for f in fields1]
         headers2 = [" "] + [AR_LABELS[f] for f in fields2]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_{now}.pdf"
@@ -1072,7 +1063,7 @@ class EmployeeTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 11px;
+                    font-size: 9px;
                     {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
@@ -1109,30 +1100,17 @@ class EmployeeTab(QWidget):
             <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers1)}
-                    </tr>
-                    <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers2)}
+                        {''.join(f'<th>{h}</th>' for h in headers)}
                     </tr>
                 </thead>
                 <tbody>
         """
 
-
-        for idx, emp in enumerate(rows):
-            zebra = 'zebra1' if idx % 2 == 0 else 'zebra2'
-            # First row: serial + first half
-            html += f'<tr class="{zebra}"><td>{idx+1}</td>'
-            for i in range(half):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
-            # Second row: empty serial + second half
-            html += f'<tr class="{zebra}"><td></td>'
-            for i in range(half, len(EMPLOYEE_FIELDS)):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
+        for idx, emp in enumerate(rows):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
 
         html += """
                 </tbody>
@@ -1175,7 +1153,7 @@ class EmployeeTab(QWidget):
         half = 9
         fields1 = EMPLOYEE_FIELDS[:half]
         fields2 = EMPLOYEE_FIELDS[half:]
-        headers1 = [AR_LABELS[f] for f in fields1]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
         headers2 = [AR_LABELS[f] for f in fields2]
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
@@ -1223,7 +1201,7 @@ class EmployeeTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 11px;
+                    font-size: 9px;
                     {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
@@ -1264,29 +1242,17 @@ class EmployeeTab(QWidget):
             <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers1)}
-                    </tr>
-                    <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers2)}
+                        {''.join(f'<th>{h}</th>' for h in headers)}
                     </tr>
                 </thead>
                 <tbody>
         """
 
-        for idx, emp in enumerate(employees):
-            row_class = "" if idx % 2 == 0 else "row-alt"
-            # First row: first 9 fields
-            html += f'<tr class="{row_class}">'
-            for i in range(half):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
-            # Second row: next 9 fields
-            html += f'<tr class="{row_class}">'
-            for i in range(half, half*2):
-                val = emp[i] if i < len(emp) and emp[i] else ""
-                html += f'<td>{val}</td>'
-            html += '</tr>'
+        for idx, emp in enumerate(employees):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
 
         html += """
                 </tbody>
