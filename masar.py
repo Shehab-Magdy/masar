@@ -37,12 +37,14 @@ AR_LABELS = {
     "attachments": "ملفات مرتبطة",
     "personal_photo": "صورة شخصية",
     "retirement_date": "تاريخ المعاش"
+    ,"insurance_doc": "وثيقة التامين"
+    ,"serial": "مسلسل"
 }
 
 EMPLOYEE_FIELDS = [
     "name", "grade", "grade_date", "hire_date", "file_no", "qualification",
     "functional_group", "type_group", "job_title", "department", "current_work",
-    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "notes"
+    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "notes", "insurance_doc"
 ]
 
 def init_db():
@@ -53,16 +55,20 @@ def init_db():
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        # Add retirement_date to the table creation
+        # Add insurance_doc and retirement_date to the table creation
         c.execute(f"""
             CREATE TABLE IF NOT EXISTS employee (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 {', '.join([f"{f} TEXT" for f in EMPLOYEE_FIELDS])}
             )
         """)
-        # Try to add the column if missing (for upgrades)
+        # Try to add the columns if missing (for upgrades)
         try:
             c.execute("ALTER TABLE employee ADD COLUMN retirement_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN insurance_doc TEXT")
         except sqlite3.OperationalError:
             pass
         c.execute("""
@@ -385,12 +391,15 @@ class EmployeeTab(QWidget):
         self.table.setHorizontalHeaderLabels([AR_LABELS[f] for f in EMPLOYEE_FIELDS])
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.cellClicked.connect(self.on_row_select)
-        self.table.setSortingEnabled(True)  # <-- Enable sorting by clicking headers
+        self.table.setSortingEnabled(True)
+        # Zebra striping for GUI table
+        self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet("QTableWidget {alternate-background-color: #f2f2f2; background-color: #fff;}")
         main_layout.addWidget(self.table)
         
         # Replace the QFormLayout with a QGridLayout for two columns
         grid_layout = QGridLayout()
-        grid_layout.setAlignment(Qt.AlignRight)
+        grid_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         grid_layout.setHorizontalSpacing(12)
         grid_layout.setVerticalSpacing(8)
 
@@ -401,11 +410,11 @@ class EmployeeTab(QWidget):
 
         for idx, f in enumerate(EMPLOYEE_FIELDS):
             row = idx % fields_per_col
-            col = (idx // fields_per_col) * 2  # 0 for first col, 2 for second col
+            col = (idx // fields_per_col) * 2
             label = QLabel(AR_LABELS[f])
             label.setMinimumWidth(0)
             label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-            self.form_fields[f].setAlignment(Qt.AlignLeft)
+            self.form_fields[f].setAlignment(Qt.AlignmentFlag.AlignLeft)
             self.form_fields[f].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             grid_layout.addWidget(label, row, col)
             grid_layout.addWidget(self.form_fields[f], row, col + 1)
@@ -451,9 +460,10 @@ class EmployeeTab(QWidget):
         btns_layout.addWidget(self.btn_export_filtered)
         grid_layout.addLayout(btns_layout, row_offset + 3, 0, 1, 4)
 
+
         form_widget = QWidget()
         form_widget.setLayout(grid_layout)
-        form_widget.setLayoutDirection(Qt.RightToLeft)
+        form_widget.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         main_layout.addWidget(form_widget)
         layout.addLayout(main_layout)
         self.setLayout(layout)
@@ -497,7 +507,10 @@ class EmployeeTab(QWidget):
         :return: None
         :rtype: NoneType
         """
-        emp_id = self.table.verticalHeaderItem(row).text()
+        vh_item = self.table.verticalHeaderItem(row)
+        if vh_item is None:
+            return
+        emp_id = vh_item.text()
         c = self.conn.cursor()
         c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE id=?", (emp_id,))
         row_data = c.fetchone()
@@ -575,7 +588,7 @@ class EmployeeTab(QWidget):
         :rtype: NoneType
         """
         if self.photo_path and os.path.exists(self.photo_path):
-            pixmap = QPixmap(self.photo_path).scaled(80, 80, Qt.KeepAspectRatio)
+            pixmap = QPixmap(self.photo_path).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio)
             self.photo_label.setPixmap(pixmap)
         else:
             self.photo_label.clear()
@@ -959,6 +972,7 @@ class EmployeeTab(QWidget):
         - Second row: next 9 fields (with labels)
         """
         # Gather data from the table (only visible/filtered rows)
+
         rows = []
         for row_idx in range(self.table.rowCount()):
             row = []
@@ -971,11 +985,12 @@ class EmployeeTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
             return
 
-        half = 9
+        half = (len(EMPLOYEE_FIELDS) + 1) // 2
         fields1 = EMPLOYEE_FIELDS[:half]
         fields2 = EMPLOYEE_FIELDS[half:]
-        headers1 = [AR_LABELS[f] for f in fields1]
-        headers2 = [AR_LABELS[f] for f in fields2]
+        # Add serial number to the first column in PDF only
+        headers1 = [AR_LABELS["serial"]] + [AR_LABELS[f] for f in fields1]
+        headers2 = [" "] + [AR_LABELS[f] for f in fields2]
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_{now}.pdf"
@@ -1017,15 +1032,11 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
-                tr:nth-child(odd) {{
-                    background-color: #ffffff;
-                }}
-                tr:nth-child(even) {{
-                    background-color: #f2f2f2;
-                }}
+                tr.zebra1 {{ background-color: #fff; }}
+                tr.zebra2 {{ background-color: #f2f2f2; }}
                 @page {{
                     size: A4 landscape;
-                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    margin: 1cm 1cm 2cm 1cm;
                     @bottom-center {{
                         content: counter(page) "/" counter(pages);
                         font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
@@ -1049,17 +1060,18 @@ class EmployeeTab(QWidget):
                 <tbody>
         """
 
+
         for idx, emp in enumerate(rows):
-            row_class = "" if idx % 2 == 0 else "row-alt"
-            # First row: first 9 fields
-            html += f'<tr class="{row_class}">'
+            zebra = 'zebra1' if idx % 2 == 0 else 'zebra2'
+            # First row: serial + first half
+            html += f'<tr class="{zebra}"><td>{idx+1}</td>'
             for i in range(half):
                 val = emp[i] if i < len(emp) and emp[i] else ""
                 html += f'<td>{val}</td>'
             html += '</tr>'
-            # Second row: next 9 fields
-            html += f'<tr class="{row_class}">'
-            for i in range(half, half*2):
+            # Second row: empty serial + second half
+            html += f'<tr class="{zebra}"><td></td>'
+            for i in range(half, len(EMPLOYEE_FIELDS)):
                 val = emp[i] if i < len(emp) and emp[i] else ""
                 html += f'<td>{val}</td>'
             html += '</tr>'
