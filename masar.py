@@ -147,7 +147,7 @@ class MasarMainWindow(QMainWindow):
         "لوحة التحكم", "الموظفين", and "التقارير".
         """
         super().__init__()
-        self.setWindowTitle("مسار - إدارة الموظفين")
+        self.setWindowTitle("مسار - منظومة العاملين المدنيين بالورش")
         self.setGeometry(100, 100, 1100, 700)
         # Set window icon
         from PyQt5.QtGui import QIcon
