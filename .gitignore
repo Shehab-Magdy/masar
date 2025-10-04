@@ -213,3 +213,4 @@ masar.db
 attachments/
 dist.zip
 .DS_Store
+masar.spec
