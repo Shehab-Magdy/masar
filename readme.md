@@ -76,7 +76,7 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 2. **Build the Executable**
 
    ```sh
-   pyinstaller --onefile --windowed --add-data "masar.png:." --add-data "attachments:attachments" masar.py
+   pyinstaller --onefile --windowed --icon "masar.ico" --add-data "masar-bg.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" masar.py   
    ```
 
    The executable will be created in the `dist` directory.

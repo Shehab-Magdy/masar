@@ -1284,7 +1284,7 @@ if __name__ == "__main__":
     init_db()
     app = QApplication(sys.argv)
     window = MasarMainWindow()
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec_())
 
 """

@@ -1,0 +1,15 @@
+PyQt5==5.15.10
+PyQt5-sip==12.13.0
+PyQt5-Qt5==5.15.2
+weasyprint==61.2
+cairocffi==1.6.1
+cffi==1.16.0
+cssselect2==0.7.0
+fonttools==4.51.0
+Pillow==10.3.0
+pycparser==2.22
+pyphen==0.14.0
+tinycss2==1.2.1
+importlib-resources==6.4.0
+attrs==23.2.0
+typing-extensions==4.11.0
