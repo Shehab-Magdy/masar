@@ -5,14 +5,15 @@ import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QFormLayout
+    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
-import re
 import shutil
+import base64
+from pdf_bg_utils import process_bg_image
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -36,13 +37,16 @@ AR_LABELS = {
     "phone": "رقم التليفون",
     "notes": "ملاحظات",
     "attachments": "ملفات مرتبطة",
-    "personal_photo": "صورة شخصية"
+    "personal_photo": "صورة شخصية",
+    "retirement_date": "تاريخ المعاش"
+    ,"insurance_doc": "وثيقة التامين"
+    ,"serial": "مسلسل"
 }
 
 EMPLOYEE_FIELDS = [
     "name", "grade", "grade_date", "hire_date", "file_no", "qualification",
     "functional_group", "type_group", "job_title", "department", "current_work",
-    "birth_date", "insurance_no", "national_id", "address", "phone", "notes"
+    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "notes", "insurance_doc"
 ]
 
 def init_db():
@@ -53,13 +57,22 @@ def init_db():
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
+        # Add insurance_doc and retirement_date to the table creation
         c.execute(f"""
             CREATE TABLE IF NOT EXISTS employee (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 {', '.join([f"{f} TEXT" for f in EMPLOYEE_FIELDS])}
             )
         """)
-        # Add new columns if not exist (for upgrades)
+        # Try to add the columns if missing (for upgrades)
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN retirement_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN insurance_doc TEXT")
+        except sqlite3.OperationalError:
+            pass
         c.execute("""
             CREATE TABLE IF NOT EXISTS attachment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +85,7 @@ def init_db():
                 FOREIGN KEY(employee_id) REFERENCES employee(id)
             )
         """)
-        # Try to add columns if missing (safe for existing DBs)
+        # Try to add columns if not exist (for upgrades)
         try:
             c.execute("ALTER TABLE attachment ADD COLUMN filetype TEXT")
         except sqlite3.OperationalError:
@@ -134,7 +147,7 @@ class MasarMainWindow(QMainWindow):
         "لوحة التحكم", "الموظفين", and "التقارير".
         """
         super().__init__()
-        self.setWindowTitle("مسار - إدارة الموظفين")
+        self.setWindowTitle("مسار - منظومة العاملين المدنيين بالورش")
         self.setGeometry(100, 100, 1100, 700)
         # Set window icon
         from PyQt5.QtGui import QIcon
@@ -142,44 +155,51 @@ class MasarMainWindow(QMainWindow):
         self.conn = sqlite3.connect(DB_FILE)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
-        self.tabs.addTab(DashboardTab(self.conn), "لوحة التحكم")
+        self.tabs.addTab(DashboardTab(self.conn), "الإحصائيات")
         self.tabs.addTab(EmployeeTab(self.conn), "الموظفين")
 
 
 class DashboardTab(QWidget):
     def __init__(self, conn):
-        """
-        Initializes the dashboard tab.
-
-        Sets the window title and layout. It also refreshes the counts of employees, departments, and attachments.
-
-        :param conn: The database connection.
-        :type conn: sqlite3.Connection
-        """
         super().__init__()
         self.conn = conn
         layout = QVBoxLayout()
-        self.lbl_title = QLabel("لوحة التحكم")
+        self.lbl_title = QLabel("الإحصائيات")
         self.lbl_title.setStyleSheet("font-size:24px; font-weight:bold; color:#1976d2;")
         layout.addWidget(self.lbl_title)
         self.lbl_emp = QLabel()
         self.lbl_dept = QLabel()
         self.lbl_att = QLabel()
+        self.lbl_retire_this_year = QLabel()
         layout.addWidget(self.lbl_emp)
         layout.addWidget(self.lbl_dept)
         layout.addWidget(self.lbl_att)
+        layout.addWidget(self.lbl_retire_this_year)
+
+        # --- Add table for employees retiring this year ---
+        # self.retire_table = QTableWidget()
+        # self.retire_table.setColumnCount(2)
+        # self.retire_table.setHorizontalHeaderLabels(["الاسم", "رقم الملف"])
+        # self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
+        # self.retire_table.setSortingEnabled(False)
+        # layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
+        # layout.addWidget(self.retire_table)
+
+        # --- Add refresh and print buttons side by side ---
+        btns_layout = QHBoxLayout()
         self.btn_refresh = QPushButton("تحديث")
         self.btn_refresh.clicked.connect(self.refresh_counts)
-        layout.addWidget(self.btn_refresh)
+        btns_layout.addWidget(self.btn_refresh)
+        self.btn_print_retire = QPushButton("تصدير الموظفون الذين تاريخ معاشهم في هذا العام كـ PDF")
+        self.btn_print_retire.clicked.connect(self.export_retire_pdf)
+        btns_layout.addWidget(self.btn_print_retire)
+        layout.addLayout(btns_layout)
+
         self.setLayout(layout)
         self.refresh_counts()
 
     def refresh_counts(self):
-        """
-        Refreshes the counts of employees, departments, and attachments on the dashboard tab.
-
-        Queries the database to get the counts and updates the labels accordingly.
-        """
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) FROM employee")
         emp_count = c.fetchone()[0]
@@ -187,9 +207,182 @@ class DashboardTab(QWidget):
         dept_count = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM attachment")
         att_count = c.fetchone()[0]
+        current_year = datetime.date.today().year
+        c.execute("""
+            SELECT COUNT(*) FROM employee
+            WHERE retirement_date IS NOT NULL
+              AND retirement_date != ''
+              AND substr(retirement_date, 1, 4) = ?
+        """, (str(current_year),))
+        retire_this_year = c.fetchone()[0]
         self.lbl_emp.setText(f"عدد الموظفين: {emp_count}")
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
-        self.lbl_att.setText(f"عدد الملفات المرتبطة: {att_count}")
+        self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
+        self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
+
+        # --- Fill the retire_table with employees retiring this year ---
+        # self.retire_table.setRowCount(0)
+        # c.execute("""
+        #     SELECT name, file_no FROM employee
+        #     WHERE retirement_date IS NOT NULL
+        #       AND retirement_date != ''
+        #       AND substr(retirement_date, 1, 4) = ?
+        # """, (str(current_year),))
+        # for row_idx, (name, file_no) in enumerate(c.fetchall()):
+        #     self.retire_table.insertRow(row_idx)
+        #     self.retire_table.setItem(row_idx, 0, QTableWidgetItem(str(name)))
+        #     self.retire_table.setItem(row_idx, 1, QTableWidgetItem(str(file_no)))
+
+    def export_retire_pdf(self):
+        """
+        Export the full data of employees whose retirement date is in the current year as a PDF,
+        using the same split-header, 9-columns-per-row, two-rows-per-employee design as export_filtered_pdf/export_pdf.
+        """
+        # Prepare headers and get current year
+        half = 9
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        headers1 = [AR_LABELS[f] for f in fields1]
+        headers2 = [AR_LABELS[f] for f in fields2]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        current_year = datetime.date.today().year
+
+        # Query all fields for employees retiring this year
+        c = self.conn.cursor()
+        c.execute(f"""
+            SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee
+            WHERE retirement_date IS NOT NULL
+              AND retirement_date != ''
+              AND substr(retirement_date, 1, 4) = ?
+        """, (str(current_year),))
+        rows = c.fetchall()
+
+        if not rows:
+            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
+            return
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        default_name = f"Employees_Retirement_{now}.pdf"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ قائمة المعاش كـ PDF",
+            default_name,
+            "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+        
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        first_line_header = ""
+        second_line_header = ""
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
+        html = f"""
+        <html lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @font-face {{
+                    font-family: 'Amiri';
+                    src: url('Amiri-Regular.ttf');
+                }}
+                body {{
+                    direction: rtl;
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: 9px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin-bottom: 20px;
+                }}
+                th, td {{
+                    border: 1px solid #888;
+                    padding: 6px 4px;
+                    word-break: break-word;
+                    vertical-align: top;
+                    text-align: right;
+                }}
+                th {{
+                    background: #b3d1f7;
+                }}
+                tr:nth-child(odd) {{
+                    background-color: #ffffff;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f2f2f2;
+                }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align:center;">تقرير الموظفين الذين تاريخ معاشهم في هذا العام</h2>
+            <table dir="rtl">
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers)}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for idx, emp in enumerate(rows):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
+
+        html += """
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+
+        try:
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير القائمة بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير القائمة: {e}")
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
@@ -212,8 +405,8 @@ class EmployeeTab(QWidget):
         self.search_field = QLineEdit()
         self.search_field.setPlaceholderText("بحث بالاسم أو القسم أو الرقم القومى أو رقم الملف...")
         self.search_field.textChanged.connect(lambda: self.search_employees(self.search_field.text()))
-        search_layout.addWidget(QLabel("بحث:"))
         search_layout.addWidget(self.search_field)
+        search_layout.addWidget(QLabel("بحث:"))
         layout.addLayout(search_layout)
         main_layout = QHBoxLayout()
         self.table = QTableWidget()
@@ -221,14 +414,38 @@ class EmployeeTab(QWidget):
         self.table.setHorizontalHeaderLabels([AR_LABELS[f] for f in EMPLOYEE_FIELDS])
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.cellClicked.connect(self.on_row_select)
-        self.table.setSortingEnabled(True)  # <-- Enable sorting by clicking headers
+        self.table.setSortingEnabled(True)
+        # Zebra striping for GUI table
+        self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet("QTableWidget {alternate-background-color: #f2f2f2; background-color: #fff;}")
         main_layout.addWidget(self.table)
-        form_layout = QFormLayout()
+        
+        # Replace the QFormLayout with a QGridLayout for two columns
+        grid_layout = QGridLayout()
+        grid_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        grid_layout.setHorizontalSpacing(12)
+        grid_layout.setVerticalSpacing(8)
+
         self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
-        for f in EMPLOYEE_FIELDS:
-            form_layout.addRow(AR_LABELS[f], self.form_fields[f])
         self.attach_list = QListWidget()
-        form_layout.addRow(AR_LABELS["attachments"], self.attach_list)
+        num_fields = len(EMPLOYEE_FIELDS)
+        fields_per_col = num_fields // 2 + num_fields % 2  # 9 if 18 fields
+
+        for idx, f in enumerate(EMPLOYEE_FIELDS):
+            row = idx % fields_per_col
+            col = (idx // fields_per_col) * 2
+            label = QLabel(AR_LABELS[f])
+            label.setMinimumWidth(0)
+            label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+            self.form_fields[f].setAlignment(Qt.AlignmentFlag.AlignLeft)
+            self.form_fields[f].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            grid_layout.addWidget(label, row, col)
+            grid_layout.addWidget(self.form_fields[f], row, col + 1)
+
+        # Attachments and buttons below the grid
+        row_offset = fields_per_col
+        grid_layout.addWidget(QLabel(AR_LABELS["attachments"]), row_offset, 0)
+        grid_layout.addWidget(self.attach_list, row_offset, 1, 1, 3)
         attach_btns_layout = QHBoxLayout()
         self.btn_attach = QPushButton("رفع ملفات")
         self.btn_attach.clicked.connect(self.upload_files)
@@ -236,12 +453,17 @@ class EmployeeTab(QWidget):
         self.btn_delete_attachment = QPushButton("حذف ملف")
         self.btn_delete_attachment.clicked.connect(self.delete_attachment)
         attach_btns_layout.addWidget(self.btn_delete_attachment)
-        form_layout.addRow(attach_btns_layout)
+        grid_layout.addLayout(attach_btns_layout, row_offset + 1, 1, 1, 3)
+
+        # Photo upload and label
+        grid_layout.addWidget(QLabel(AR_LABELS["personal_photo"]), row_offset + 2, 0)
         self.btn_photo = QPushButton("رفع صورة")
         self.btn_photo.clicked.connect(self.upload_photo)
-        form_layout.addRow(AR_LABELS["personal_photo"], self.btn_photo)
+        grid_layout.addWidget(self.btn_photo, row_offset + 2, 1)
         self.photo_label = QLabel()
-        form_layout.addRow(self.photo_label)
+        grid_layout.addWidget(self.photo_label, row_offset + 2, 2)
+
+        # Action buttons
         btns_layout = QHBoxLayout()
         self.btn_add = QPushButton("إضافة")
         self.btn_add.clicked.connect(self.add_employee)
@@ -255,13 +477,16 @@ class EmployeeTab(QWidget):
         self.btn_clear = QPushButton("مسح")
         self.btn_clear.clicked.connect(self.clear_form)
         btns_layout.addWidget(self.btn_clear)
-        form_layout.addRow(btns_layout)
         # Add a button for printing/exporting the filtered list
         self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
         self.btn_export_filtered.clicked.connect(self.export_filtered_pdf)
-        form_layout.addRow(self.btn_export_filtered)
+        btns_layout.addWidget(self.btn_export_filtered)
+        grid_layout.addLayout(btns_layout, row_offset + 3, 0, 1, 4)
+
+
         form_widget = QWidget()
-        form_widget.setLayout(form_layout)
+        form_widget.setLayout(grid_layout)
+        form_widget.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         main_layout.addWidget(form_widget)
         layout.addLayout(main_layout)
         self.setLayout(layout)
@@ -305,7 +530,10 @@ class EmployeeTab(QWidget):
         :return: None
         :rtype: NoneType
         """
-        emp_id = self.table.verticalHeaderItem(row).text()
+        vh_item = self.table.verticalHeaderItem(row)
+        if vh_item is None:
+            return
+        emp_id = vh_item.text()
         c = self.conn.cursor()
         c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE id=?", (emp_id,))
         row_data = c.fetchone()
@@ -383,7 +611,7 @@ class EmployeeTab(QWidget):
         :rtype: NoneType
         """
         if self.photo_path and os.path.exists(self.photo_path):
-            pixmap = QPixmap(self.photo_path).scaled(80, 80, Qt.KeepAspectRatio)
+            pixmap = QPixmap(self.photo_path).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio)
             self.photo_label.setPixmap(pixmap)
         else:
             self.photo_label.clear()
@@ -497,6 +725,13 @@ class EmployeeTab(QWidget):
         insurance_no = self.form_fields["insurance_no"].text().strip()
         phone = self.form_fields["phone"].text().strip()
         date_fields = ["grade_date", "hire_date", "birth_date"]
+        # Add retirement_date for format validation only
+        retirement_date_str = self.form_fields["retirement_date"].text().strip()
+        if retirement_date_str:
+            try:
+                datetime.datetime.strptime(retirement_date_str, "%Y-%m-%d")
+            except Exception:
+                return False, f"صيغة التاريخ غير صحيحة في {AR_LABELS['retirement_date']} (يرجى استخدام YYYY-MM-DD)"
 
         # الاسم: مطلوب
         if not name:
@@ -754,10 +989,13 @@ class EmployeeTab(QWidget):
 
     def export_filtered_pdf(self):
         """
-        Exports the currently filtered list of employees in the table as a PDF, using the same format as the main report.
+        Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
+        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
+        - First row: first 9 fields (with labels)
+        - Second row: next 9 fields (with labels)
         """
         # Gather data from the table (only visible/filtered rows)
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+
         rows = []
         for row_idx in range(self.table.rowCount()):
             row = []
@@ -770,23 +1008,17 @@ class EmployeeTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
             return
 
-        # Generate default file name with current date and time
+        half = (len(EMPLOYEE_FIELDS) + 1) // 2
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        # Add serial number to the first column in PDF only
+        headers1 = [AR_LABELS["serial"]] + [AR_LABELS[f] for f in fields1]
+        headers2 = [" "] + [AR_LABELS[f] for f in fields2]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+
+
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        default_name = f"Employees_Filtered_{now}.pdf"
-
-        # Define int fields for column width
-        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
-
-        # Build colgroup for column widths
-        colgroup = "<colgroup>"
-        for f in EMPLOYEE_FIELDS[::-1]:
-            if f in int_fields:
-                colgroup += '<col style="width:8%;">'
-            else:
-                colgroup += '<col style="width:auto;">'
-        colgroup += "</colgroup>"
-
-        # Ask user for file location
+        default_name = f"Employees_{now}.pdf"
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "حفظ النتائج كـ PDF",
@@ -795,116 +1027,30 @@ class EmployeeTab(QWidget):
         )
         if not file_path:
             return
-
-        # Build HTML table with RTL and Arabic font
-        html = f"""
-        <html lang="ar">
-        <head>
-            <meta charset="utf-8">
-            <style>
-                @font-face {{
-                    font-family: 'Amiri';
-                    src: url('Amiri-Regular.ttf');
-                }}
-                body {{
-                    direction: ltr;
-                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 10px;
-                }}
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    table-layout: fixed;
-                }}
-                th, td {{
-                    border: 1px solid #888;
-                    padding: 6px 4px;
-                    word-break: break-word;
-                    vertical-align: top;
-                    text-align: right;
-                }}
-                th {{
-                    background: #b3d1f7;
-                }}
-            </style>
-        </head>
-        <body>
-            <h2 style="text-align:center;">تقرير الموظفين (حسب البحث)</h2>
-            <table dir="ltr">
-                {colgroup}
-                <thead>
-                    <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        for row in rows:
-            html += "<tr>"
-            for cell in row[::-1]:
-                html += f"<td>{cell if cell else ''}</td>"
-            html += "</tr>"
-        html += """
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
-
-        # Save HTML to PDF using WeasyPrint
-        try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
-            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
-            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
-
-    def export_pdf(self):
-        """
-        Exports the full report as a landscape A4 PDF, one employee per row, wrapped cells, Arabic support, RTL using WeasyPrint.
-
-        Retrieves all employee records from the database, generates a default file name with the current date and time,
-        asks the user for a file location using a file dialog, builds an HTML table with RTL and Arabic font, then saves the HTML to a PDF file using WeasyPrint.
-
-        Shows an information message box with a success message if the export is successful, or a critical message box with an error message if an exception occurs during the export process.
-
-        :return: None
-        :rtype: NoneType
-        """
-        c = self.conn.cursor()
-        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
-        rows = c.fetchall()
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-
-        # Generate default file name with current date and time
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        default_name = f"Employees {now}.pdf"
-
-        # Define int fields for column width
-        int_fields = ["file_no", "national_id", "insurance_no", "phone"]
-
-        # Build colgroup for column widths
-        colgroup = "<colgroup>"
-        for f in EMPLOYEE_FIELDS[::-1]:
-            if f in int_fields:
-                colgroup += '<col style="width:8%;">'
-            else:
-                colgroup += '<col style="width:auto;">'
-        colgroup += "</colgroup>"
-
-        # Ask user for file location
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "حفظ التقرير كـ PDF",
-            default_name,
-            "PDF Files (*.pdf)"
-        )
-        if not file_path:
-            return
-
-        # Build HTML table with RTL and Arabic font
+        
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        first_line_header = ""
+        second_line_header = ""
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
         html = f"""
         <html lang="ar">
         <head>
@@ -917,12 +1063,13 @@ class EmployeeTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 10px;
+                    font-size: 9px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
                     width: 100%;
-                    table-layout: fixed;
+                    margin-bottom: 20px;
                 }}
                 th, td {{
                     border: 1px solid #888;
@@ -934,24 +1081,37 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                tr.zebra1 {{ background-color: #fff; }}
+                tr.zebra2 {{ background-color: #f2f2f2; }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm;
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
             </style>
         </head>
         <body>
             <h2 style="text-align:center;">تقرير الموظفين</h2>
-            <table dir="ltr">
-                {colgroup}
+            <table dir="rtl">
                 <thead>
                     <tr>
-                        {''.join(f'<th>{h}</th>' for h in headers[::-1])}
+                        {''.join(f'<th>{h}</th>' for h in headers)}
                     </tr>
                 </thead>
                 <tbody>
         """
-        for row in rows:
-            html += "<tr>"
-            for cell in row[::-1]:
-                html += f"<td>{cell if cell else ''}</td>"
-            html += "</tr>"
+
+        for idx, emp in enumerate(rows):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
+
         html += """
                 </tbody>
             </table>
@@ -959,11 +1119,160 @@ class EmployeeTab(QWidget):
         </html>
         """
 
-        # Save HTML to PDF using WeasyPrint
         try:
-            css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm; }
-            ''')
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير النتائج: {e}")
+
+    def export_pdf(self):
+        """
+        Exports all employees as a printable PDF report using WeasyPrint.
+        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
+        - First row: first 9 fields (with labels)
+        - Second row: next 9 fields (with labels)
+        """
+        c = self.conn.cursor()
+        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
+        employees = c.fetchall()
+        if not employees:
+            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
+            return
+
+        half = 9
+        fields1 = EMPLOYEE_FIELDS[:half]
+        fields2 = EMPLOYEE_FIELDS[half:]
+        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        headers2 = [AR_LABELS[f] for f in fields2]
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ التقرير كـ PDF",
+            f"employees_report_{now}.pdf",
+            "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        # Prepare background image as base64 (only if file and config exist and are valid)
+        bg_url = None
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        first_line_header = ""
+        second_line_header = ""
+        if os.path.isfile(cfg_path):
+            try:
+                import json
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                first_line_header = cfg.get('firstLineHeader', "")
+                second_line_header = cfg.get('secondLineHeader', "")
+            except Exception:
+                first_line_header = ""
+                second_line_header = ""
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
+        html = f"""
+        <html lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @font-face {{
+                    font-family: 'Amiri';
+                    src: url('Amiri-Regular.ttf');
+                }}
+                body {{
+                    direction: rtl;
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: 9px;
+                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin-bottom: 20px;
+                }}
+                th, td {{
+                    border: 1px solid #888;
+                    padding: 6px 4px;
+                    word-break: break-word;
+                    vertical-align: top;
+                    text-align: right;
+                }}
+                th {{
+                    background: #b3d1f7;
+                }}
+                tr:nth-child(odd) {{
+                    background-color: #ffffff;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f2f2f2;
+                }}
+                @page {{
+                    size: A4 landscape;
+                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    @bottom-center {{
+                        content: counter(page) "/" counter(pages);
+                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                        font-size: 12px;
+                        color: #444;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align:center;">تقرير الموظفين</h2>
+            <table dir="rtl">
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{h}</th>' for h in headers)}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for idx, emp in enumerate(employees):  # or employees
+            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+            html += f'<tr class="{row_class}">' + ''.join(
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+            ) + '</tr>'
+
+        html += """
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+
+        try:
+            css = CSS(string="""
+                @page { 
+                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                        @top-right {
+                            content: '{first_line_header.replace("'", "\\'")}\\A{second_line_header.replace("'", "\\'")}';
+                            font-size: 15px;
+                            color: #1976d2;
+                            text-align: right;
+                            white-space: pre;
+                      }
+            """)
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير التقرير بنجاح كملف PDF.")
         except Exception as e:
