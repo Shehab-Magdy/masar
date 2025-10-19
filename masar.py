@@ -244,7 +244,8 @@ class DashboardTab(QWidget):
         fields2 = EMPLOYEE_FIELDS[half:]
         headers1 = [AR_LABELS[f] for f in fields1]
         headers2 = [AR_LABELS[f] for f in fields2]
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        # add leading serial column label 'م'
+        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
         current_year = datetime.date.today().year
 
         # Query all fields for employees retiring this year
@@ -308,7 +309,7 @@ class DashboardTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 9px;
-                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
+                    {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -344,7 +345,7 @@ class DashboardTab(QWidget):
             </style>
         </head>
         <body>
-            <h2 style="text-align:center;">تقرير الموظفين الذين تاريخ معاشهم في هذا العام</h2>
+            <h2 style="text-align:center;">بيانات الخروج على المعاش</h2>
             <table dir="rtl">
                 <thead>
                     <tr>
@@ -356,7 +357,8 @@ class DashboardTab(QWidget):
 
         for idx, emp in enumerate(rows):  # or employees
             row_class = "zebra1" if idx % 2 == 0 else "zebra2"
-            html += f'<tr class="{row_class}">' + ''.join(
+            serial = idx + 1
+            html += f'<tr class="{row_class}"><td>{serial}</td>' + ''.join(
                 f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
             ) + '</tr>'
 
@@ -1011,10 +1013,8 @@ class EmployeeTab(QWidget):
         half = (len(EMPLOYEE_FIELDS) + 1) // 2
         fields1 = EMPLOYEE_FIELDS[:half]
         fields2 = EMPLOYEE_FIELDS[half:]
-        # Add serial number to the first column in PDF only
-        headers1 = [AR_LABELS["serial"]] + [AR_LABELS[f] for f in fields1]
-        headers2 = [" "] + [AR_LABELS[f] for f in fields2]
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        # Add leading Arabic serial column 'م'
+        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
 
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
@@ -1064,7 +1064,7 @@ class EmployeeTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 9px;
-                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
+                    {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -1096,7 +1096,7 @@ class EmployeeTab(QWidget):
             </style>
         </head>
         <body>
-            <h2 style="text-align:center;">تقرير الموظفين</h2>
+            <h2 style="text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
             <table dir="rtl">
                 <thead>
                     <tr>
@@ -1108,7 +1108,8 @@ class EmployeeTab(QWidget):
 
         for idx, emp in enumerate(rows):  # or employees
             row_class = "zebra1" if idx % 2 == 0 else "zebra2"
-            html += f'<tr class="{row_class}">' + ''.join(
+            serial = idx + 1
+            html += f'<tr class="{row_class}"><td>{serial}</td>' + ''.join(
                 f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
             ) + '</tr>'
 
@@ -1153,7 +1154,8 @@ class EmployeeTab(QWidget):
         half = 9
         fields1 = EMPLOYEE_FIELDS[:half]
         fields2 = EMPLOYEE_FIELDS[half:]
-        headers = [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        # leading serial column
+        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
         headers2 = [AR_LABELS[f] for f in fields2]
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
@@ -1202,7 +1204,7 @@ class EmployeeTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 9px;
-                    {'background: url("'+bg_url+'"); background-size: cover; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
+                    {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -1238,7 +1240,7 @@ class EmployeeTab(QWidget):
             </style>
         </head>
         <body>
-            <h2 style="text-align:center;">تقرير الموظفين</h2>
+            <h2 style="text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
             <table dir="rtl">
                 <thead>
                     <tr>
@@ -1250,7 +1252,8 @@ class EmployeeTab(QWidget):
 
         for idx, emp in enumerate(employees):  # or employees
             row_class = "zebra1" if idx % 2 == 0 else "zebra2"
-            html += f'<tr class="{row_class}">' + ''.join(
+            serial = idx + 1
+            html += f'<tr class="{row_class}"><td>{serial}</td>' + ''.join(
                 f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
             ) + '</tr>'
 

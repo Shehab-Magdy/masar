@@ -31,13 +31,11 @@ Masar is a desktop application for managing employee records, attachments, and r
 Install all dependencies with:
 ```sh
 pip install pyqt5 pillow weasyprint
-```
-
----
-
-## Installation
-
-1. **Clone or Download the Repository**
+   ```sh
+   pyinstaller --onefile --windowed --name MasarApp --icon "masar.ico" --win-private-assemblies --win-no-prefer-redirects \
+     --add-data "masar-bg.png;." --add-data "masar.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." \
+     --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" masar.py
+   ```
 
    Download the source code and place it in your desired directory.
 
@@ -76,7 +74,11 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 2. **Build the Executable**
 
    ```sh
+<<<<<<< HEAD
    pyinstaller --onefile --windowed --icon "masar.ico" --add-data "masar-bg.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" masar.py   
+=======
+   pyinstaller --onefile--windowed --name MasarApp --win-private-assemblies --win-no-prefer-redirects --add-data "masar.png:." --add-data "config.json;." --icon "masar.ico" masar.py
+>>>>>>> fcdbd48 (Add serial number column to employee tables and update report titles for clarity)
    ```
 
    The executable will be created in the `dist` directory.
