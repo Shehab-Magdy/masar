@@ -372,7 +372,7 @@ class DashboardTab(QWidget):
         try:
             css = CSS(string="""
                 @page { 
-                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                      size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
                         @top-right {
                             content: '""" + first_line_header + """\\A""" + second_line_header + """';
                             font-size: 15px;
@@ -1123,7 +1123,7 @@ class EmployeeTab(QWidget):
         try:
             css = CSS(string="""
                 @page { 
-                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                      size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
                         @top-right {
                             content: '""" + first_line_header + """\\A""" + second_line_header + """';
                             font-size: 15px;
@@ -1229,7 +1229,7 @@ class EmployeeTab(QWidget):
                 }}
                 @page {{
                     size: A4 landscape;
-                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    margin: 1cm 1cm 1.5cm 1cm; /* extra bottom margin for footer */
                     @bottom-center {{
                         content: counter(page) "/" counter(pages);
                         font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
@@ -1267,7 +1267,7 @@ class EmployeeTab(QWidget):
         try:
             css = CSS(string="""
                 @page { 
-                      size: A4 landscape; margin: 1cm 0.5cm 2cm 0.5cm;
+                      size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
                         @top-right {
                             content: '{first_line_header.replace("'", "\\'")}\\A{second_line_header.replace("'", "\\'")}';
                             font-size: 15px;
