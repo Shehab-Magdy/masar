@@ -214,3 +214,4 @@ attachments/
 dist.zip
 .DS_Store
 masar.spec
+*.zip
