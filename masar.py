@@ -46,7 +46,7 @@ AR_LABELS = {
 EMPLOYEE_FIELDS = [
     "name", "grade", "grade_date", "hire_date", "file_no", "qualification",
     "functional_group", "type_group", "job_title", "department", "current_work",
-    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "notes", "insurance_doc"
+    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "insurance_doc", "notes"
 ]
 
 def init_db():
