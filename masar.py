@@ -326,8 +326,9 @@ class DashboardTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                /* light rows should be transparent so the PDF background shows through */
                 tr:nth-child(odd) {{
-                    background-color: #ffffff;
+                    background-color: transparent;
                 }}
                 tr:nth-child(even) {{
                     background-color: #f2f2f2;
@@ -419,7 +420,8 @@ class EmployeeTab(QWidget):
         self.table.setSortingEnabled(True)
         # Zebra striping for GUI table
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet("QTableWidget {alternate-background-color: #f2f2f2; background-color: #fff;}")
+        # use transparent for the base/background rows so the UI background shows through
+        self.table.setStyleSheet("QTableWidget {alternate-background-color: #f2f2f2; background-color: transparent;}")
         main_layout.addWidget(self.table)
         
         # Replace the QFormLayout with a QGridLayout for two columns
@@ -1081,7 +1083,8 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
-                tr.zebra1 {{ background-color: #fff; }}
+                /* light rows transparent so background/print paper shows through */
+                tr.zebra1 {{ background-color: transparent; }}
                 tr.zebra2 {{ background-color: #f2f2f2; }}
                 @page {{
                     size: A4 landscape;
@@ -1221,8 +1224,9 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                /* light rows should be transparent so the PDF background shows through */
                 tr:nth-child(odd) {{
-                    background-color: #ffffff;
+                    background-color: transparent;
                 }}
                 tr:nth-child(even) {{
                     background-color: #f2f2f2;
