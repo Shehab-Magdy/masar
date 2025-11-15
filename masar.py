@@ -259,13 +259,27 @@ class DashboardTab(QWidget):
     def _export_retire_pdf_months(self, months: int | None):
         """
         Export employees whose `retirement_date` is within the next `months` months.
-        If `months` is None, fall back to exporting those whose retirement year == current year.
+        # Accept empty input (treat as fallback to current-year behavior), default to 6
         """
-        # Prepare headers and get current year
-        half = 9
-        fields1 = EMPLOYEE_FIELDS[:half]
-        fields2 = EMPLOYEE_FIELDS[half:]
-        headers1 = [AR_LABELS[f] for f in fields1]
+        default_val = 6
+        text, ok = QInputDialog.getText(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", text=str(default_val))
+        if not ok:
+            return
+        text = text.strip()
+        if text == "":
+            # empty input -> use fallback behavior (months=None)
+            self._export_retire_pdf_months(None)
+            return
+        # try parse integer
+        try:
+            months = int(text)
+        except Exception:
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال رقم صحيح للأشهر أو اتركه فارغًا.")
+            return
+        if months <= 0:
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال عدد أكبر من صفر أو اتركه فارغًا.")
+            return
+        self._export_retire_pdf_months(months)
         headers2 = [AR_LABELS[f] for f in fields2]
         # add leading serial column label 'م'
         headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
