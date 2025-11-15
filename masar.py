@@ -7,12 +7,14 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
     QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout
 )
+from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import mimetypes
 import shutil
 import base64
+import calendar
 from pdf_bg_utils import process_bg_image
 
 DB_FILE = "masar.db"
@@ -192,7 +194,7 @@ class DashboardTab(QWidget):
         self.btn_refresh.clicked.connect(self.refresh_counts)
         btns_layout.addWidget(self.btn_refresh)
         self.btn_print_retire = QPushButton("تصدير الموظفون الذين تاريخ معاشهم في هذا العام كـ PDF")
-        self.btn_print_retire.clicked.connect(self.export_retire_pdf)
+        self.btn_print_retire.clicked.connect(self.prompt_and_export_retire)
         btns_layout.addWidget(self.btn_print_retire)
         layout.addLayout(btns_layout)
 
@@ -238,6 +240,27 @@ class DashboardTab(QWidget):
         Export the full data of employees whose retirement date is in the current year as a PDF,
         using the same split-header, 9-columns-per-row, two-rows-per-employee design as export_filtered_pdf/export_pdf.
         """
+        # Backwards-compatible wrapper: if called without months, export current-year retirees
+        return self._export_retire_pdf_months(None)
+
+    def prompt_and_export_retire(self):
+        """
+        Show an input dialog asking for the number of months (عدد الاشهر) and call the exporter.
+        The entered number represents the next N months from the current month.
+        """
+        try:
+            months, ok = QInputDialog.getInt(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", value=1, min=1, max=120)
+        except Exception:
+            months, ok = QInputDialog.getInt(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", value=1, min=1, max=120)
+        if not ok:
+            return
+        self._export_retire_pdf_months(months)
+
+    def _export_retire_pdf_months(self, months: int | None):
+        """
+        Export employees whose `retirement_date` is within the next `months` months.
+        If `months` is None, fall back to exporting those whose retirement year == current year.
+        """
         # Prepare headers and get current year
         half = 9
         fields1 = EMPLOYEE_FIELDS[:half]
@@ -246,17 +269,53 @@ class DashboardTab(QWidget):
         headers2 = [AR_LABELS[f] for f in fields2]
         # add leading serial column label 'م'
         headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-        current_year = datetime.date.today().year
+        today = datetime.date.today()
 
-        # Query all fields for employees retiring this year
         c = self.conn.cursor()
-        c.execute(f"""
-            SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee
-            WHERE retirement_date IS NOT NULL
-              AND retirement_date != ''
-              AND substr(retirement_date, 1, 4) = ?
-        """, (str(current_year),))
-        rows = c.fetchall()
+        # Fetch all employees that have a non-empty retirement_date, then filter in Python when months provided
+        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE retirement_date IS NOT NULL AND retirement_date != ''")
+        all_rows = c.fetchall()
+
+        def parse_retirement_date(s: str):
+            if not s:
+                return None
+            s = s.strip()
+            for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
+                try:
+                    dt = datetime.datetime.strptime(s, fmt)
+                    # normalize to a date object (use first day if month/year only)
+                    if fmt == "%Y":
+                        return datetime.date(dt.year, 1, 1)
+                    if fmt == "%Y-%m":
+                        return datetime.date(dt.year, dt.month, 1)
+                    return datetime.date(dt.year, dt.month, dt.day)
+                except Exception:
+                    continue
+            return None
+
+        def add_months(d: datetime.date, months_to_add: int) -> datetime.date:
+            # Add months to a date while keeping day within month bounds
+            total_month = d.month - 1 + months_to_add
+            new_year = d.year + total_month // 12
+            new_month = total_month % 12 + 1
+            last_day = calendar.monthrange(new_year, new_month)[1]
+            new_day = min(d.day, last_day)
+            return datetime.date(new_year, new_month, new_day)
+
+        rows = []
+        if months is None:
+            # fallback behavior: current year retirees (preserve previous behavior)
+            current_year = today.year
+            for row in all_rows:
+                rd = parse_retirement_date(row[EMPLOYEE_FIELDS.index('retirement_date')])
+                if rd and rd.year == current_year:
+                    rows.append(row)
+        else:
+            end_date = add_months(today, months)
+            for row in all_rows:
+                rd = parse_retirement_date(row[EMPLOYEE_FIELDS.index('retirement_date')])
+                if rd and today <= rd <= end_date:
+                    rows.append(row)
 
         if not rows:
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
