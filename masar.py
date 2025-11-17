@@ -5,7 +5,7 @@ import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout
+    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout, QDateEdit
 )
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtGui import QPixmap
@@ -15,6 +15,7 @@ import mimetypes
 import shutil
 import base64
 import calendar
+import time
 from pdf_bg_utils import process_bg_image
 
 DB_FILE = "masar.db"
@@ -96,10 +97,31 @@ def init_db():
             c.execute("ALTER TABLE attachment ADD COLUMN upload_date TEXT")
         except sqlite3.OperationalError:
             pass
+        # Create correspondence table for faxes/letters
+        try:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS correspondence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fax_number TEXT,
+                    fax_date TEXT,
+                    from_person TEXT,
+                    to_person TEXT,
+                    subject TEXT,
+                    notes TEXT,
+                    image_path TEXT,
+                    created_at TEXT
+                )
+            """)
+        except Exception:
+            pass
         conn.commit()
         conn.close()
         if not os.path.exists(ATTACHMENTS_DIR):
             os.makedirs(ATTACHMENTS_DIR)
+        # ensure faxes attachments folder exists
+        faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
+        if not os.path.exists(faxes_dir):
+            os.makedirs(faxes_dir)
     except Exception as e:
         print("Database initialization error:", e)
 
@@ -159,6 +181,12 @@ class MasarMainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(DashboardTab(self.conn), "الإحصائيات")
         self.tabs.addTab(EmployeeTab(self.conn), "الموظفين")
+        # Correspondence tab (المراسلات)
+        try:
+            self.tabs.addTab(CorrespondenceTab(self.conn), "المراسلات")
+        except NameError:
+            # Class may be defined later in file; adding tab will work after import
+            pass
 
 
 class DashboardTab(QWidget):
@@ -1359,7 +1387,410 @@ class EmployeeTab(QWidget):
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير التقرير: {e}")
 
 
-    
+class CorrespondenceTab(QWidget):
+    """Tab for managing correspondence (المراسلات) with full CRUD, search, and PDF export."""
+    def __init__(self, conn):
+        super().__init__()
+        self.conn = conn
+        self.selected_id = None
+        self.temp_image_path = None
+
+        main_layout = QVBoxLayout()
+
+        # Search panel
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("من التاريخ:"))
+        self.search_from = QDateEdit()
+        self.search_from.setCalendarPopup(True)
+        self.search_from.setDisplayFormat("yyyy-MM-dd")
+        self.search_from.setDate(datetime.date.today())
+        search_layout.addWidget(self.search_from)
+
+        search_layout.addWidget(QLabel("إلى التاريخ:"))
+        self.search_to = QDateEdit()
+        self.search_to.setCalendarPopup(True)
+        self.search_to.setDisplayFormat("yyyy-MM-dd")
+        self.search_to.setDate(datetime.date.today())
+        search_layout.addWidget(self.search_to)
+
+        search_layout.addWidget(QLabel("الموضوع:"))
+        self.search_subject = QLineEdit()
+        self.search_subject.setPlaceholderText("بحث في الموضوع...")
+        search_layout.addWidget(self.search_subject)
+
+        self.btn_search = QPushButton("بحث")
+        self.btn_search.clicked.connect(self.search_entries)
+        search_layout.addWidget(self.btn_search)
+
+        self.btn_export_results = QPushButton("تصدير النتائج")
+        self.btn_export_results.clicked.connect(self.export_results_pdf)
+        search_layout.addWidget(self.btn_export_results)
+
+        main_layout.addLayout(search_layout)
+
+        # Main content layout: table and form
+        content_layout = QHBoxLayout()
+
+        # Table of correspondence
+        self.table = QTableWidget()
+        self.table.setColumnCount(8)
+        headers = ["مسلسل", "رقم الفاكس", "التاريخ", "من", "إلى", "الموضوع", "الملاحظات", "الصورة"]
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.cellClicked.connect(self.on_row_select)
+        self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet("QTableWidget {alternate-background-color: #f2f2f2; background-color: transparent;}")
+        content_layout.addWidget(self.table, 2)
+
+        # Form layout
+        form_layout = QGridLayout()
+        row = 0
+        form_layout.addWidget(QLabel("رقم الفاكس:"), row, 0)
+        self.fax_number = QLineEdit()
+        form_layout.addWidget(self.fax_number, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("التاريخ:"), row, 0)
+        self.fax_date = QDateEdit()
+        self.fax_date.setCalendarPopup(True)
+        self.fax_date.setDisplayFormat("yyyy-MM-dd")
+        self.fax_date.setDate(datetime.date.today())
+        form_layout.addWidget(self.fax_date, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("من:"), row, 0)
+        self.from_person = QLineEdit()
+        form_layout.addWidget(self.from_person, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("إلى:"), row, 0)
+        self.to_person = QLineEdit()
+        form_layout.addWidget(self.to_person, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("الموضوع:"), row, 0)
+        self.subject = QLineEdit()
+        form_layout.addWidget(self.subject, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("الملاحظات:"), row, 0)
+        self.notes = QTextEdit()
+        form_layout.addWidget(self.notes, row, 1)
+        row += 1
+
+        form_layout.addWidget(QLabel("رفع صورة الفاكس:"), row, 0)
+        btn_img = QPushButton("اختر صورة")
+        btn_img.clicked.connect(self.browse_image)
+        form_layout.addWidget(btn_img, row, 1)
+        self.lbl_image_name = QLabel("")
+        form_layout.addWidget(self.lbl_image_name, row, 2)
+        row += 1
+
+        # Action buttons
+        btns = QHBoxLayout()
+        self.btn_add = QPushButton("إضافة")
+        self.btn_add.clicked.connect(self.add_entry)
+        btns.addWidget(self.btn_add)
+        self.btn_edit = QPushButton("تعديل")
+        self.btn_edit.clicked.connect(self.edit_entry)
+        btns.addWidget(self.btn_edit)
+        self.btn_delete = QPushButton("حذف")
+        self.btn_delete.clicked.connect(self.delete_entry)
+        btns.addWidget(self.btn_delete)
+        self.btn_clear = QPushButton("مسح")
+        self.btn_clear.clicked.connect(self.clear_form)
+        btns.addWidget(self.btn_clear)
+
+        form_layout.addLayout(btns, row, 0, 1, 3)
+
+        form_widget = QWidget()
+        form_widget.setLayout(form_layout)
+        content_layout.addWidget(form_widget, 1)
+
+        main_layout.addLayout(content_layout)
+
+        self.setLayout(main_layout)
+        self.load_entries()
+
+    def browse_image(self):
+        f, _ = QFileDialog.getOpenFileName(self, "اختر صورة الفاكس", "", "Images (*.png *.jpg *.jpeg)")
+        if f:
+            self.temp_image_path = f
+            self.lbl_image_name.setText(os.path.basename(f))
+
+    def clear_form(self):
+        self.selected_id = None
+        self.fax_number.clear()
+        self.fax_date.setDate(datetime.date.today())
+        self.from_person.clear()
+        self.to_person.clear()
+        self.subject.clear()
+        self.notes.clear()
+        self.temp_image_path = None
+        self.lbl_image_name.setText("")
+
+    def load_entries(self, where_clause: str = "", params: tuple = ()): 
+        c = self.conn.cursor()
+        q = "SELECT id, fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at FROM correspondence"
+        if where_clause:
+            q += " WHERE " + where_clause
+        q += " ORDER BY fax_date DESC"
+        c.execute(q, params)
+        rows = c.fetchall()
+        self.table.setRowCount(0)
+        for idx, row in enumerate(rows):
+            rid = row[0]
+            self.table.insertRow(idx)
+            # serial
+            self.table.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
+            self.table.setItem(idx, 1, QTableWidgetItem(str(row[1] or "")))
+            self.table.setItem(idx, 2, QTableWidgetItem(str(row[2] or "")))
+            self.table.setItem(idx, 3, QTableWidgetItem(str(row[3] or "")))
+            self.table.setItem(idx, 4, QTableWidgetItem(str(row[4] or "")))
+            self.table.setItem(idx, 5, QTableWidgetItem(str(row[5] or "")))
+            self.table.setItem(idx, 6, QTableWidgetItem(str(row[6] or "")))
+            self.table.setItem(idx, 7, QTableWidgetItem(os.path.basename(row[7]) if row[7] else ""))
+            self.table.setVerticalHeaderItem(idx, QTableWidgetItem(str(rid)))
+
+    def on_row_select(self, row, col):
+        vh = self.table.verticalHeaderItem(row)
+        if vh is None:
+            return
+        rid = vh.text()
+        c = self.conn.cursor()
+        c.execute("SELECT id, fax_number, fax_date, from_person, to_person, subject, notes, image_path FROM correspondence WHERE id=?", (rid,))
+        r = c.fetchone()
+        if not r:
+            return
+        self.selected_id = r[0]
+        self.fax_number.setText(r[1] or "")
+        try:
+            if r[2]:
+                dt = datetime.datetime.strptime(r[2], "%Y-%m-%d").date()
+                self.fax_date.setDate(dt)
+        except Exception:
+            pass
+        self.from_person.setText(r[3] or "")
+        self.to_person.setText(r[4] or "")
+        self.subject.setText(r[5] or "")
+        self.notes.setPlainText(r[6] or "")
+        self.temp_image_path = r[7]
+        self.lbl_image_name.setText(os.path.basename(r[7]) if r[7] else "")
+
+    def _validate_form(self):
+        fax_no = self.fax_number.text().strip()
+        subj = self.subject.text().strip()
+        if not fax_no:
+            return False, "رقم الفاكس مطلوب"
+        if not subj:
+            return False, "الموضوع مطلوب"
+        # date validation
+        d = self.fax_date.date().toPyDate()
+        if d > datetime.date.today():
+            return False, "التاريخ لا يمكن أن يكون في المستقبل"
+        return True, ""
+
+    def _save_image(self, fax_number: str) -> str | None:
+        if not self.temp_image_path:
+            return None
+        faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
+        if not os.path.exists(faxes_dir):
+            os.makedirs(faxes_dir)
+        ext = os.path.splitext(self.temp_image_path)[1]
+        fname = f"{fax_number}_{int(time.time())}{ext}"
+        dest = os.path.join(faxes_dir, fname)
+        try:
+            with open(self.temp_image_path, 'rb') as src, open(dest, 'wb') as dst:
+                dst.write(src.read())
+            return dest
+        except Exception:
+            return None
+
+    def add_entry(self):
+        ok, msg = self._validate_form()
+        if not ok:
+            QMessageBox.warning(self, "خطأ في البيانات", msg)
+            return
+        fax_no = self.fax_number.text().strip()
+        fax_date = self.fax_date.date().toString("yyyy-MM-dd")
+        from_p = self.from_person.text().strip()
+        to_p = self.to_person.text().strip()
+        subj = self.subject.text().strip()
+        notes = self.notes.toPlainText().strip()
+        image_path = self._save_image(fax_no)
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c = self.conn.cursor()
+        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (fax_no, fax_date, from_p, to_p, subj, notes, image_path or '', created_at))
+        self.conn.commit()
+        self.clear_form()
+        self.load_entries()
+
+    def edit_entry(self):
+        if not self.selected_id:
+            QMessageBox.warning(self, "تحذير", "الرجاء اختيار سجل للتعديل")
+            return
+        ok, msg = self._validate_form()
+        if not ok:
+            QMessageBox.warning(self, "خطأ في البيانات", msg)
+            return
+        fax_no = self.fax_number.text().strip()
+        fax_date = self.fax_date.date().toString("yyyy-MM-dd")
+        from_p = self.from_person.text().strip()
+        to_p = self.to_person.text().strip()
+        subj = self.subject.text().strip()
+        notes = self.notes.toPlainText().strip()
+        image_path = self._save_image(fax_no)
+        c = self.conn.cursor()
+        if image_path:
+            c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=?, image_path=? WHERE id=?",
+                      (fax_no, fax_date, from_p, to_p, subj, notes, image_path, self.selected_id))
+        else:
+            c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=? WHERE id=?",
+                      (fax_no, fax_date, from_p, to_p, subj, notes, self.selected_id))
+        self.conn.commit()
+        self.clear_form()
+        self.load_entries()
+
+    def delete_entry(self):
+        if not self.selected_id:
+            QMessageBox.warning(self, "تحذير", "الرجاء اختيار سجل للحذف")
+            return
+        ok = QMessageBox.question(self, "تأكيد", "هل تريد حذف السجل المحدد؟")
+        if ok != QMessageBox.Yes:
+            return
+        c = self.conn.cursor()
+        # optionally remove image file
+        c.execute("SELECT image_path FROM correspondence WHERE id=?", (self.selected_id,))
+        r = c.fetchone()
+        if r and r[0]:
+            try:
+                if os.path.exists(r[0]):
+                    os.remove(r[0])
+            except Exception:
+                pass
+        c.execute("DELETE FROM correspondence WHERE id=?", (self.selected_id,))
+        self.conn.commit()
+        self.clear_form()
+        self.load_entries()
+
+    def search_entries(self):
+        clauses = []
+        params = []
+        # date range
+        from_d = self.search_from.date().toPyDate()
+        to_d = self.search_to.date().toPyDate()
+        if from_d and to_d:
+            # ensure from_d <= to_d
+            if from_d > to_d:
+                QMessageBox.warning(self, "خطأ", "نطاق التواريخ غير صالح")
+                return
+            clauses.append("fax_date BETWEEN ? AND ?")
+            params.extend([from_d.strftime("%Y-%m-%d"), to_d.strftime("%Y-%m-%d")])
+        subj = self.search_subject.text().strip()
+        if subj:
+            clauses.append("subject LIKE ?")
+            params.append(f"%{subj}%")
+        where = " AND ".join(clauses)
+        self.load_entries(where, tuple(params))
+
+    def export_results_pdf(self):
+        # reuse search to get rows
+        clauses = []
+        params = []
+        from_d = self.search_from.date().toPyDate()
+        to_d = self.search_to.date().toPyDate()
+        if from_d and to_d:
+            if from_d > to_d:
+                QMessageBox.warning(self, "خطأ", "نطاق التواريخ غير صالح")
+                return
+            clauses.append("fax_date BETWEEN ? AND ?")
+            params.extend([from_d.strftime("%Y-%m-%d"), to_d.strftime("%Y-%m-%d")])
+        subj = self.search_subject.text().strip()
+        if subj:
+            clauses.append("subject LIKE ?")
+            params.append(f"%{subj}%")
+        where = " AND ".join(clauses)
+        c = self.conn.cursor()
+        q = "SELECT fax_number, fax_date, from_person, to_person, subject, notes, image_path FROM correspondence"
+        if where:
+            q += " WHERE " + where
+        q += " ORDER BY fax_date DESC"
+        c.execute(q, tuple(params))
+        rows = c.fetchall()
+        if not rows:
+            QMessageBox.warning(self, "تنبيه", "لا توجد نتائج للتصدير")
+            return
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        file_path, _ = QFileDialog.getSaveFileName(self, "حفظ المراسلات كـ PDF", f"correspondence_{now}.pdf", "PDF Files (*.pdf)")
+        if not file_path:
+            return
+
+        # prepare background
+        bg_url = None
+        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
+        cfg_path = os.path.join(os.getcwd(), 'config.json')
+        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
+            try:
+                bg_bytes = process_bg_image(bg_path, cfg_path)
+                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
+                bg_url = f"data:image/png;base64,{bg_b64}"
+            except Exception:
+                bg_url = None
+
+        # build html
+        html = f"""
+        <html lang="ar">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @font-face {{ font-family: 'Amiri'; src: url('Amiri-Regular.ttf'); }}
+            body {{ direction: rtl; font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif; font-size: 11px; {'background: url("'+bg_url+'") no-repeat center center; background-size: contain;' if bg_url else ''} }}
+            table {{ border-collapse: collapse; width: 100%; table-layout: fixed; word-wrap: break-word; }}
+            th, td {{ border: 1px solid #888; padding: 6px; vertical-align: top; text-align: right; word-break: break-word; white-space: pre-wrap; }}
+            th {{ background: #b3d1f7; }}
+            tr:nth-child(odd) {{ background-color: transparent; }}
+            tr:nth-child(even) {{ background-color: #f2f2f2; }}
+            @page {{ size: A4 portrait; margin: 1cm; @bottom-center {{ content: counter(page) "/" counter(pages); }} }}
+          </style>
+        </head>
+        <body>
+          <h2 style="text-align:center;">قائمة المراسلات</h2>
+          <table dir="rtl">
+            <thead>
+              <tr>
+                <th>مسلسل</th>
+                <th>رقم الفاكس</th>
+                <th>التاريخ</th>
+                <th>من</th>
+                <th>إلى</th>
+                <th>الموضوع</th>
+                <th>الملاحظات</th>
+              </tr>
+            </thead>
+            <tbody>
+        """
+
+        for idx, r in enumerate(rows):
+            serial = idx + 1
+            fax_no, fax_date, from_p, to_p, subj, notes, img = r
+            html += f"<tr><td>{serial}</td><td>{fax_no or ''}</td><td>{fax_date or ''}</td><td>{from_p or ''}</td><td>{to_p or ''}</td><td>{(subj or '')}</td><td>{(notes or '').replace('\n','<br/>')}</td></tr>"
+
+        html += """
+            </tbody>
+          </table>
+        </body>
+        </html>
+        """
+
+        try:
+            css = CSS(string='@page { size: A4 portrait; margin: 1cm; }')
+            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
+            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء التصدير: {e}")
+
+
 if __name__ == "__main__":
     init_db()
     app = QApplication(sys.argv)
