@@ -114,6 +114,20 @@ def init_db():
             """)
         except Exception:
             pass
+        # Attachments for correspondence (multiple images per correspondence)
+        try:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS correspondence_attachment (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    correspondence_id INTEGER,
+                    filename TEXT,
+                    filepath TEXT,
+                    upload_date TEXT,
+                    FOREIGN KEY(correspondence_id) REFERENCES correspondence(id)
+                )
+            """)
+        except Exception:
+            pass
         conn.commit()
         conn.close()
         if not os.path.exists(ATTACHMENTS_DIR):
@@ -1393,7 +1407,10 @@ class CorrespondenceTab(QWidget):
         super().__init__()
         self.conn = conn
         self.selected_id = None
-        self.temp_image_path = None
+        # temporary new images (file paths selected but not yet saved to DB)
+        self.temp_images = []
+        # existing attachments loaded from DB for the selected correspondence
+        self.current_attachments = []  # list of tuples (id, filename, filepath)
 
         main_layout = QVBoxLayout()
 
@@ -1478,12 +1495,20 @@ class CorrespondenceTab(QWidget):
         form_layout.addWidget(self.notes, row, 1)
         row += 1
 
-        form_layout.addWidget(QLabel("رفع صورة الفاكس:"), row, 0)
-        btn_img = QPushButton("اختر صورة")
+        form_layout.addWidget(QLabel("رفع صور الفاكس:"), row, 0)
+        btn_img = QPushButton("اختر صور")
         btn_img.clicked.connect(self.browse_image)
         form_layout.addWidget(btn_img, row, 1)
-        self.lbl_image_name = QLabel("")
-        form_layout.addWidget(self.lbl_image_name, row, 2)
+        # list widget showing selected and existing images
+        from PyQt5.QtWidgets import QListWidgetItem
+        self.fax_images_list = QListWidget()
+        self.fax_images_list.setFixedHeight(90)
+        form_layout.addWidget(self.fax_images_list, row, 2)
+        row += 1
+        # remove selected image button
+        btn_remove_img = QPushButton("حذف الصورة المحددة")
+        btn_remove_img.clicked.connect(self.remove_selected_image)
+        form_layout.addWidget(btn_remove_img, row, 2)
         row += 1
 
         # Action buttons
@@ -1513,10 +1538,15 @@ class CorrespondenceTab(QWidget):
         self.load_entries()
 
     def browse_image(self):
-        f, _ = QFileDialog.getOpenFileName(self, "اختر صورة الفاكس", "", "Images (*.png *.jpg *.jpeg)")
-        if f:
-            self.temp_image_path = f
-            self.lbl_image_name.setText(os.path.basename(f))
+        files, _ = QFileDialog.getOpenFileNames(self, "اختر صور الفاكس", "", "Images (*.png *.jpg *.jpeg)")
+        if not files:
+            return
+        for f in files:
+            if f:
+                self.temp_images.append(f)
+                item = QListWidgetItem(os.path.basename(f))
+                item.setData(Qt.UserRole, ("temp", f))
+                self.fax_images_list.addItem(item)
 
     def clear_form(self):
         self.selected_id = None
@@ -1526,12 +1556,13 @@ class CorrespondenceTab(QWidget):
         self.to_person.clear()
         self.subject.clear()
         self.notes.clear()
-        self.temp_image_path = None
-        self.lbl_image_name.setText("")
+        self.temp_images = []
+        self.current_attachments = []
+        self.fax_images_list.clear()
 
     def load_entries(self, where_clause: str = "", params: tuple = ()): 
         c = self.conn.cursor()
-        q = "SELECT id, fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at FROM correspondence"
+        q = "SELECT id, fax_number, fax_date, from_person, to_person, subject, notes, created_at FROM correspondence"
         if where_clause:
             q += " WHERE " + where_clause
         q += " ORDER BY fax_date DESC"
@@ -1549,7 +1580,11 @@ class CorrespondenceTab(QWidget):
             self.table.setItem(idx, 4, QTableWidgetItem(str(row[4] or "")))
             self.table.setItem(idx, 5, QTableWidgetItem(str(row[5] or "")))
             self.table.setItem(idx, 6, QTableWidgetItem(str(row[6] or "")))
-            self.table.setItem(idx, 7, QTableWidgetItem(os.path.basename(row[7]) if row[7] else ""))
+            # show count of images for the correspondence
+            c2 = self.conn.cursor()
+            c2.execute("SELECT COUNT(*) FROM correspondence_attachment WHERE correspondence_id=?", (rid,))
+            cnt = c2.fetchone()[0]
+            self.table.setItem(idx, 7, QTableWidgetItem(str(cnt)))
             self.table.setVerticalHeaderItem(idx, QTableWidgetItem(str(rid)))
 
     def on_row_select(self, row, col):
@@ -1558,7 +1593,7 @@ class CorrespondenceTab(QWidget):
             return
         rid = vh.text()
         c = self.conn.cursor()
-        c.execute("SELECT id, fax_number, fax_date, from_person, to_person, subject, notes, image_path FROM correspondence WHERE id=?", (rid,))
+        c.execute("SELECT id, fax_number, fax_date, from_person, to_person, subject, notes FROM correspondence WHERE id=?", (rid,))
         r = c.fetchone()
         if not r:
             return
@@ -1574,8 +1609,18 @@ class CorrespondenceTab(QWidget):
         self.to_person.setText(r[4] or "")
         self.subject.setText(r[5] or "")
         self.notes.setPlainText(r[6] or "")
-        self.temp_image_path = r[7]
-        self.lbl_image_name.setText(os.path.basename(r[7]) if r[7] else "")
+        # load attachments from DB
+        self.current_attachments = []
+        self.temp_images = []
+        self.fax_images_list.clear()
+        c2 = self.conn.cursor()
+        c2.execute("SELECT id, filename, filepath FROM correspondence_attachment WHERE correspondence_id=?", (self.selected_id,))
+        for att in c2.fetchall():
+            att_id, fname, fpath = att
+            self.current_attachments.append((att_id, fname, fpath))
+            item = QListWidgetItem(fname)
+            item.setData(Qt.UserRole, ("stored", att_id, fpath))
+            self.fax_images_list.addItem(item)
 
     def _validate_form(self):
         fax_no = self.fax_number.text().strip()
@@ -1591,20 +1636,49 @@ class CorrespondenceTab(QWidget):
         return True, ""
 
     def _save_image(self, fax_number: str) -> str | None:
-        if not self.temp_image_path:
+        # legacy single-image saver: keep for compatibility (not used)
+        if not self.temp_images:
             return None
         faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
         if not os.path.exists(faxes_dir):
             os.makedirs(faxes_dir)
-        ext = os.path.splitext(self.temp_image_path)[1]
-        fname = f"{fax_number}_{int(time.time())}{ext}"
-        dest = os.path.join(faxes_dir, fname)
-        try:
-            with open(self.temp_image_path, 'rb') as src, open(dest, 'wb') as dst:
-                dst.write(src.read())
-            return dest
-        except Exception:
-            return None
+        # save all temp images and return the first saved path (or None)
+        saved_paths = []
+        for idx, src_path in enumerate(self.temp_images):
+            try:
+                ext = os.path.splitext(src_path)[1]
+                fname = f"{fax_number}_{int(time.time())}_{idx}{ext}"
+                dest = os.path.join(faxes_dir, fname)
+                with open(src_path, 'rb') as src, open(dest, 'wb') as dst:
+                    dst.write(src.read())
+                saved_paths.append(dest)
+            except Exception:
+                continue
+        return saved_paths[0] if saved_paths else None
+
+    def _save_images_and_create_attachments(self, correspondence_id: int, fax_number: str):
+        """Save all temp images to disk and create rows in correspondence_attachment."""
+        if not self.temp_images:
+            return
+        faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
+        if not os.path.exists(faxes_dir):
+            os.makedirs(faxes_dir)
+        c = self.conn.cursor()
+        for idx, src_path in enumerate(self.temp_images):
+            try:
+                ext = os.path.splitext(src_path)[1]
+                fname = f"{fax_number}_{correspondence_id}_{int(time.time())}_{idx}{ext}"
+                dest = os.path.join(faxes_dir, fname)
+                with open(src_path, 'rb') as src, open(dest, 'wb') as dst:
+                    dst.write(src.read())
+                upload_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                c.execute("INSERT INTO correspondence_attachment (correspondence_id, filename, filepath, upload_date) VALUES (?, ?, ?, ?)",
+                          (correspondence_id, fname, dest, upload_date))
+            except Exception:
+                continue
+        self.conn.commit()
+        # clear temp images after saving
+        self.temp_images = []
 
     def add_entry(self):
         ok, msg = self._validate_form()
@@ -1617,11 +1691,14 @@ class CorrespondenceTab(QWidget):
         to_p = self.to_person.text().strip()
         subj = self.subject.text().strip()
         notes = self.notes.toPlainText().strip()
-        image_path = self._save_image(fax_no)
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c = self.conn.cursor()
+        # insert correspondence record first (image attachments will be stored in correspondence_attachment)
         c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  (fax_no, fax_date, from_p, to_p, subj, notes, image_path or '', created_at))
+                  (fax_no, fax_date, from_p, to_p, subj, notes, '', created_at))
+        corr_id = c.lastrowid
+        # save any temp images and create attachment rows
+        self._save_images_and_create_attachments(corr_id, fax_no)
         self.conn.commit()
         self.clear_form()
         self.load_entries()
@@ -1640,14 +1717,11 @@ class CorrespondenceTab(QWidget):
         to_p = self.to_person.text().strip()
         subj = self.subject.text().strip()
         notes = self.notes.toPlainText().strip()
-        image_path = self._save_image(fax_no)
         c = self.conn.cursor()
-        if image_path:
-            c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=?, image_path=? WHERE id=?",
-                      (fax_no, fax_date, from_p, to_p, subj, notes, image_path, self.selected_id))
-        else:
-            c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=? WHERE id=?",
-                      (fax_no, fax_date, from_p, to_p, subj, notes, self.selected_id))
+        c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=? WHERE id=?",
+                  (fax_no, fax_date, from_p, to_p, subj, notes, self.selected_id))
+        # save any newly selected temp images and create attachment rows
+        self._save_images_and_create_attachments(self.selected_id, fax_no)
         self.conn.commit()
         self.clear_form()
         self.load_entries()
@@ -1660,15 +1734,16 @@ class CorrespondenceTab(QWidget):
         if ok != QMessageBox.Yes:
             return
         c = self.conn.cursor()
-        # optionally remove image file
-        c.execute("SELECT image_path FROM correspondence WHERE id=?", (self.selected_id,))
-        r = c.fetchone()
-        if r and r[0]:
+        # remove attachment files and rows
+        c.execute("SELECT filepath FROM correspondence_attachment WHERE correspondence_id=?", (self.selected_id,))
+        for (fp,) in c.fetchall():
             try:
-                if os.path.exists(r[0]):
-                    os.remove(r[0])
+                if fp and os.path.exists(fp):
+                    os.remove(fp)
             except Exception:
                 pass
+        c.execute("DELETE FROM correspondence_attachment WHERE correspondence_id=?", (self.selected_id,))
+        # remove correspondence row
         c.execute("DELETE FROM correspondence WHERE id=?", (self.selected_id,))
         self.conn.commit()
         self.clear_form()
@@ -1693,6 +1768,48 @@ class CorrespondenceTab(QWidget):
             params.append(f"%{subj}%")
         where = " AND ".join(clauses)
         self.load_entries(where, tuple(params))
+
+    def remove_selected_image(self):
+        """Remove selected image from the list. If it's a stored attachment, delete from DB and disk."""
+        item = self.fax_images_list.currentItem()
+        if not item:
+            return
+        data = item.data(Qt.UserRole)
+        if not data:
+            # just remove from widget
+            self.fax_images_list.takeItem(self.fax_images_list.currentRow())
+            return
+        if data[0] == "temp":
+            # remove from temp_images list
+            path = data[1]
+            try:
+                self.temp_images.remove(path)
+            except ValueError:
+                pass
+            self.fax_images_list.takeItem(self.fax_images_list.currentRow())
+            return
+        if data[0] == "stored":
+            att_id = data[1]
+            fpath = data[2]
+            # confirm deletion
+            ok = QMessageBox.question(self, "تأكيد", "هل تريد حذف هذه الصورة من السجل؟")
+            if ok != QMessageBox.Yes:
+                return
+            c = self.conn.cursor()
+            try:
+                if fpath and os.path.exists(fpath):
+                    os.remove(fpath)
+            except Exception:
+                pass
+            c.execute("DELETE FROM correspondence_attachment WHERE id=?", (att_id,))
+            self.conn.commit()
+            # remove from internal list and widget
+            for i in range(self.fax_images_list.count()):
+                it = self.fax_images_list.item(i)
+                d = it.data(Qt.UserRole)
+                if d and d[0] == "stored" and d[1] == att_id:
+                    self.fax_images_list.takeItem(i)
+                    break
 
     def export_results_pdf(self):
         # reuse search to get rows
