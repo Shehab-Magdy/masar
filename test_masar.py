@@ -2,7 +2,17 @@
 Unit tests for the Masar Employee Management System.
 Tests cover: database operations, text normalization, validation, CRUD operations, and data integrity.
 
-Run with: pytest test_masar.py -v
+# Run all tests with verbose output
+pytest test_masar.py -v
+
+# Run with coverage report
+pytest test_masar.py -v --cov=masar --cov-report=term-missing
+
+# Run specific test class
+pytest test_masar.py::TestNormalizeArabic -v
+
+# Run specific test
+pytest test_masar.py::TestNormalizeArabic::test_normalize_hamza_variants -v
 """
 
 import pytest
