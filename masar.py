@@ -5,11 +5,11 @@ import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout, QDateEdit
+    QMessageBox, QTextEdit, QFormLayout, QSizePolicy, QGridLayout, QDateEdit, QListWidgetItem
 )
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from weasyprint import HTML, CSS
 import mimetypes
 import shutil
@@ -17,6 +17,16 @@ import base64
 import calendar
 import time
 from pdf_bg_utils import process_bg_image
+
+
+class ClickableLabel(QLabel):
+    """A QLabel that emits a clicked signal when pressed."""
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        if event.button() == 1:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 DB_FILE = "masar.db"
 ATTACHMENTS_DIR = "attachments"
@@ -1504,11 +1514,22 @@ class CorrespondenceTab(QWidget):
         self.fax_images_list = QListWidget()
         self.fax_images_list.setFixedHeight(90)
         form_layout.addWidget(self.fax_images_list, row, 2)
+        # show thumbnail when clicking list items
+        self.fax_images_list.itemClicked.connect(self.on_image_item_clicked)
         row += 1
         # remove selected image button
         btn_remove_img = QPushButton("حذف الصورة المحددة")
         btn_remove_img.clicked.connect(self.remove_selected_image)
         form_layout.addWidget(btn_remove_img, row, 2)
+        row += 1
+        # Thumbnail display
+        form_layout.addWidget(QLabel("معاينة الصورة:"), row, 0)
+        self.thumbnail = ClickableLabel()
+        self.thumbnail.setFixedSize(220, 140)
+        self.thumbnail.setStyleSheet("border: 1px solid #ccc; background: #fff;")
+        self.thumbnail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.thumbnail.clicked.connect(self.open_current_thumbnail)
+        form_layout.addWidget(self.thumbnail, row, 1, 1, 2)
         row += 1
 
         # Action buttons
@@ -1547,6 +1568,9 @@ class CorrespondenceTab(QWidget):
                 item = QListWidgetItem(os.path.basename(f))
                 item.setData(Qt.UserRole, ("temp", f))
                 self.fax_images_list.addItem(item)
+        # show thumbnail of the last selected image
+        if files:
+            self._show_thumbnail_from_path(files[-1])
 
     def clear_form(self):
         self.selected_id = None
@@ -1621,6 +1645,11 @@ class CorrespondenceTab(QWidget):
             item = QListWidgetItem(fname)
             item.setData(Qt.UserRole, ("stored", att_id, fpath))
             self.fax_images_list.addItem(item)
+        # show thumbnail of first attachment if available
+        if self.current_attachments:
+            first_path = self.current_attachments[0][2]
+            if first_path:
+                self._show_thumbnail_from_path(first_path)
 
     def _validate_form(self):
         fax_no = self.fax_number.text().strip()
@@ -1679,6 +1708,25 @@ class CorrespondenceTab(QWidget):
         self.conn.commit()
         # clear temp images after saving
         self.temp_images = []
+        # refresh attachments list if this correspondence is currently selected
+        if self.selected_id == correspondence_id:
+            # reload attachments into list widget
+            self.fax_images_list.clear()
+            c2 = self.conn.cursor()
+            c2.execute("SELECT id, filename, filepath FROM correspondence_attachment WHERE correspondence_id=?", (self.selected_id,))
+            for att in c2.fetchall():
+                att_id, fname, fpath = att
+                item = QListWidgetItem(fname)
+                item.setData(Qt.UserRole, ("stored", att_id, fpath))
+                self.fax_images_list.addItem(item)
+        # ensure thumbnail cleared/updated
+        if self.fax_images_list.count() == 0:
+            self.thumbnail.clear()
+        else:
+            # show last saved image
+            last = self.fax_images_list.item(self.fax_images_list.count() - 1)
+            if last:
+                self.on_image_item_clicked(last)
 
     def add_entry(self):
         ok, msg = self._validate_form()
@@ -1806,10 +1854,62 @@ class CorrespondenceTab(QWidget):
             # remove from internal list and widget
             for i in range(self.fax_images_list.count()):
                 it = self.fax_images_list.item(i)
+                if it is None:
+                    continue
                 d = it.data(Qt.UserRole)
                 if d and d[0] == "stored" and d[1] == att_id:
                     self.fax_images_list.takeItem(i)
                     break
+        # clear thumbnail if no items left
+        if self.fax_images_list.count() == 0:
+            self.thumbnail.clear()
+
+    def on_image_item_clicked(self, item):
+        if item is None:
+            return
+        data = item.data(Qt.UserRole)
+        if not data:
+            return
+        if data[0] == "temp":
+            path = data[1]
+        elif data[0] == "stored":
+            path = data[2]
+        else:
+            path = None
+        if path:
+            self._show_thumbnail_from_path(path)
+
+    def _show_thumbnail_from_path(self, path: str):
+        try:
+            if not path or not os.path.exists(path):
+                self.thumbnail.setText("لا توجد صورة")
+                self.current_thumbnail_path = None
+                return
+            pix = QPixmap(path)
+            if pix.isNull():
+                self.thumbnail.setText("لا يمكن عرض الصورة")
+                self.current_thumbnail_path = None
+                return
+            scaled = pix.scaled(self.thumbnail.width(), self.thumbnail.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.thumbnail.setPixmap(scaled)
+            self.current_thumbnail_path = path
+        except Exception:
+            self.thumbnail.setText("خطأ في عرض الصورة")
+            self.current_thumbnail_path = None
+
+    def open_current_thumbnail(self):
+        path = getattr(self, 'current_thumbnail_path', None)
+        if not path:
+            return
+        try:
+            if sys.platform.startswith('darwin'):
+                os.system(f'open "{path}"')
+            elif os.name == 'nt':
+                os.startfile(path)
+            elif os.name == 'posix':
+                os.system(f'xdg-open "{path}"')
+        except Exception:
+            QMessageBox.warning(self, "خطأ", "تعذر فتح الملف في التطبيق الافتراضي")
 
     def export_results_pdf(self):
         # reuse search to get rows
