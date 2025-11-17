@@ -1735,9 +1735,9 @@ class CorrespondenceTab(QWidget):
             return
         fax_no = self.fax_number.text().strip()
         fax_date = self.fax_date.date().toString("yyyy-MM-dd")
-        from_p = self.from_person.text().strip()
-        to_p = self.to_person.text().strip()
-        subj = self.subject.text().strip()
+        from_p = normalize_arabic(self.from_person.text().strip())
+        to_p = normalize_arabic(self.to_person.text().strip())
+        subj = normalize_arabic(self.subject.text().strip())
         notes = self.notes.toPlainText().strip()
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c = self.conn.cursor()
@@ -1761,9 +1761,9 @@ class CorrespondenceTab(QWidget):
             return
         fax_no = self.fax_number.text().strip()
         fax_date = self.fax_date.date().toString("yyyy-MM-dd")
-        from_p = self.from_person.text().strip()
-        to_p = self.to_person.text().strip()
-        subj = self.subject.text().strip()
+        from_p = normalize_arabic(self.from_person.text().strip())
+        to_p = normalize_arabic(self.to_person.text().strip())
+        subj = normalize_arabic(self.subject.text().strip())
         notes = self.notes.toPlainText().strip()
         c = self.conn.cursor()
         c.execute("UPDATE correspondence SET fax_number=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=? WHERE id=?",
