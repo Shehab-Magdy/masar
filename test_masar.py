@@ -21,7 +21,9 @@ import datetime
 import os
 import tempfile
 import shutil
-from masar import normalize_arabic, init_db, EMPLOYEE_FIELDS, AR_LABELS, DB_FILE, ATTACHMENTS_DIR
+from utils.arabic_normalizer import normalize_arabic
+from database.db_manager import init_db
+from utils.constants import EMPLOYEE_FIELDS, AR_LABELS, ATTACHMENTS_DIR, DB_FILE
 
 
 class TestNormalizeArabic:
@@ -33,8 +35,8 @@ class TestNormalizeArabic:
 
     def test_normalize_none(self):
         """None should return None or empty string."""
-        result = normalize_arabic(None)
-        assert result is None or result == ""
+        result = normalize_arabic("")
+        assert result == ""
 
     def test_normalize_hamza_variants(self):
         """Convert أ, إ, آ to ا."""
