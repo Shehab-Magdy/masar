@@ -237,15 +237,15 @@ class DashboardTab(QWidget):
         self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.retire_table.setSortingEnabled(False)
-        layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
-        layout.addWidget(self.retire_table)
+        # layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
+        # layout.addWidget(self.retire_table)
 
         # Refresh and export buttons
         btns_layout = QHBoxLayout()
         self.btn_refresh = QPushButton("تحديث")
         self.btn_refresh.clicked.connect(self.refresh_counts)
         btns_layout.addWidget(self.btn_refresh)
-        self.btn_print_retire = QPushButton("تصدير القائمة كـ PDF")
+        self.btn_print_retire = QPushButton("تصدير الموظفين الذين تاريخ معاشهم اقترب كـ PDF")
         self.btn_print_retire.clicked.connect(self.on_print_retire_clicked)
         btns_layout.addWidget(self.btn_print_retire)
         layout.addLayout(btns_layout)
@@ -313,20 +313,33 @@ class DashboardTab(QWidget):
         month = (today.month + months - 1) % 12 + 1
         last_day = calendar.monthrange(year, month)[1]
         end_date = datetime.date(year, month, last_day)
-
+        
         headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
 
         # Query all fields for employees retiring within the next N months
         c = self.conn.cursor()
         c.execute(f"""
             SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee
-            WHERE retirement_date IS NOT NULL
-              AND retirement_date != ''
-              AND date(retirement_date) BETWEEN ? AND ?
-            ORDER BY date(retirement_date)
-        """, (today.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
-        rows = c.fetchall()
+            WHERE retirement_date IS NOT NULL AND retirement_date != ''
+            ORDER BY retirement_date
+        """)
+        all_rows = c.fetchall()
 
+        # Filter in Python
+        rows = []
+        for emp in all_rows:
+            date_str = emp[EMPLOYEE_FIELDS.index("retirement_date")]
+            try:
+                # Try both formats
+                try:
+                    dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    dt = datetime.datetime.strptime(date_str, "%d/%m/%Y").date()
+                if today <= dt <= end_date:
+                    rows.append(emp)
+            except Exception:
+                continue
+        
         if not rows:
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
             return
@@ -417,7 +430,7 @@ class DashboardTab(QWidget):
 
         try:
             css = CSS(string='''
-                @page { size: A4 landscape; margin: 1cm 1cm 2cm 1cm; }
+                @page { size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm; }
             ''')
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير القائمة بنجاح كملف PDF.")
