@@ -36,5 +36,5 @@ EMPLOYEE_FIELDS = [
     "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "insurance_doc", "notes"
 ]
 
-bg_path = os.path.join(os.getcwd(), 'assets', 'masar-bg.png')
+bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
 cfg_path = os.path.join(os.getcwd(), 'config.json')
