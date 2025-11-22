@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtGui import QPixmap
+from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, pyqtSignal
 from weasyprint import HTML, CSS
 import mimetypes
@@ -229,23 +230,23 @@ class DashboardTab(QWidget):
         layout.addWidget(self.lbl_att)
         layout.addWidget(self.lbl_retire_this_year)
 
-        # --- Add table for employees retiring this year ---
-        # self.retire_table = QTableWidget()
-        # self.retire_table.setColumnCount(2)
-        # self.retire_table.setHorizontalHeaderLabels(["الاسم", "رقم الملف"])
-        # self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        # self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
-        # self.retire_table.setSortingEnabled(False)
-        # layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
-        # layout.addWidget(self.retire_table)
+        # Table for employees retiring this year
+        self.retire_table = QTableWidget()
+        self.retire_table.setColumnCount(3)
+        self.retire_table.setHorizontalHeaderLabels(["م", "الاسم", "رقم الملف"])
+        self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.retire_table.setSortingEnabled(False)
+        layout.addWidget(QLabel("الموظفون الذين تاريخ معاشهم في هذا العام:"))
+        layout.addWidget(self.retire_table)
 
-        # --- Add refresh and print buttons side by side ---
+        # Refresh and export buttons
         btns_layout = QHBoxLayout()
         self.btn_refresh = QPushButton("تحديث")
         self.btn_refresh.clicked.connect(self.refresh_counts)
         btns_layout.addWidget(self.btn_refresh)
-        self.btn_print_retire = QPushButton("تصدير الموظفون الذين تاريخ معاشهم في هذا العام كـ PDF")
-        self.btn_print_retire.clicked.connect(self.prompt_and_export_retire)
+        self.btn_print_retire = QPushButton("تصدير القائمة كـ PDF")
+        self.btn_print_retire.clicked.connect(self.on_print_retire_clicked)
         btns_layout.addWidget(self.btn_print_retire)
         layout.addLayout(btns_layout)
 
@@ -263,9 +264,7 @@ class DashboardTab(QWidget):
         current_year = datetime.date.today().year
         c.execute("""
             SELECT COUNT(*) FROM employee
-            WHERE retirement_date IS NOT NULL
-              AND retirement_date != ''
-              AND substr(retirement_date, 1, 4) = ?
+            WHERE retirement_date IS NOT NULL AND retirement_date != '' AND substr(retirement_date, 1, 4) = ?
         """, (str(current_year),))
         retire_this_year = c.fetchone()[0]
         self.lbl_emp.setText(f"عدد الموظفين: {emp_count}")
@@ -273,114 +272,60 @@ class DashboardTab(QWidget):
         self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
         self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
 
-        # --- Fill the retire_table with employees retiring this year ---
-        # self.retire_table.setRowCount(0)
-        # c.execute("""
-        #     SELECT name, file_no FROM employee
-        #     WHERE retirement_date IS NOT NULL
-        #       AND retirement_date != ''
-        #       AND substr(retirement_date, 1, 4) = ?
-        # """, (str(current_year),))
-        # for row_idx, (name, file_no) in enumerate(c.fetchall()):
-        #     self.retire_table.insertRow(row_idx)
-        #     self.retire_table.setItem(row_idx, 0, QTableWidgetItem(str(name)))
-        #     self.retire_table.setItem(row_idx, 1, QTableWidgetItem(str(file_no)))
+        # Fill the retire_table with employees retiring this year
+        self.retire_table.setRowCount(0)
+        c.execute("""
+            SELECT name, file_no FROM employee
+            WHERE retirement_date IS NOT NULL AND retirement_date != '' AND substr(retirement_date, 1, 4) = ?
+        """, (str(current_year),))
+        for row_idx, (name, file_no) in enumerate(c.fetchall()):
+            self.retire_table.insertRow(row_idx)
+            self.retire_table.setItem(row_idx, 0, QTableWidgetItem(str(row_idx + 1)))
+            self.retire_table.setItem(row_idx, 1, QTableWidgetItem(str(name)))
+            self.retire_table.setItem(row_idx, 2, QTableWidgetItem(str(file_no)))
 
-    def export_retire_pdf(self):
+    def on_print_retire_clicked(self):
         """
-        Export the full data of employees whose retirement date is in the current year as a PDF,
-        using the same split-header, 9-columns-per-row, two-rows-per-employee design as export_filtered_pdf/export_pdf.
+        Show a dialog to get the number of upcoming months, validate, and call export_retire_pdf(months).
         """
-        # Backwards-compatible wrapper: if called without months, export current-year retirees
-        return self._export_retire_pdf_months(None)
-
-    def prompt_and_export_retire(self):
-        """
-        Show an input dialog asking for the number of months (عدد الاشهر) and call the exporter.
-        The entered number represents the next N months from the current month.
-        """
-        try:
-            months, ok = QInputDialog.getInt(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", value=1, min=1, max=120)
-        except Exception:
-            months, ok = QInputDialog.getInt(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", value=1, min=1, max=120)
+        months, ok = QInputDialog.getInt(
+            self,
+            "إدخال عدد الأشهر",
+            "من فضلك أدخل عدد الأشهر القادمة:",
+            value=6, min=1, max=120
+        )
         if not ok:
+            return  # User cancelled
+        if months < 1:
+            QMessageBox.warning(self, "تنبيه", "يرجى إدخال رقم موجب أكبر من الصفر لعدد الأشهر.")
             return
-        self._export_retire_pdf_months(months)
+        self.export_retire_pdf(months)
 
-    def _export_retire_pdf_months(self, months: int | None):
+    def export_retire_pdf(self, months=6):
         """
-        Export employees whose `retirement_date` is within the next `months` months.
-        # Accept empty input (treat as fallback to current-year behavior), default to 6
+        Export the full data of employees whose retirement date is within the next 'months' months as a PDF,
+        using the same columns and design as the main employee export.
         """
-        default_val = 6
-        text, ok = QInputDialog.getText(self, "إدخال عدد الأشهر", "من فضلك أدخل عدد الأشهر القادمة لحساب من يقترب تاريخ تقاعدهم:", text=str(default_val))
-        if not ok:
-            return
-        text = text.strip()
-        if text == "":
-            # empty input -> use fallback behavior (months=None)
-            self._export_retire_pdf_months(None)
-            return
-        # try parse integer
-        try:
-            months = int(text)
-        except Exception:
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال رقم صحيح للأشهر أو اتركه فارغًا.")
-            return
-        if months <= 0:
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال عدد أكبر من صفر أو اتركه فارغًا.")
-            return
-        self._export_retire_pdf_months(months)
-        headers2 = [AR_LABELS[f] for f in fields2]
-        # add leading serial column label 'م'
-        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+        # Calculate date range
         today = datetime.date.today()
+        # Add months to today (handle year wrap)
+        year = today.year + (today.month + months - 1) // 12
+        month = (today.month + months - 1) % 12 + 1
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = datetime.date(year, month, last_day)
 
+        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+
+        # Query all fields for employees retiring within the next N months
         c = self.conn.cursor()
-        # Fetch all employees that have a non-empty retirement_date, then filter in Python when months provided
-        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE retirement_date IS NOT NULL AND retirement_date != ''")
-        all_rows = c.fetchall()
-
-        def parse_retirement_date(s: str):
-            if not s:
-                return None
-            s = s.strip()
-            for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
-                try:
-                    dt = datetime.datetime.strptime(s, fmt)
-                    # normalize to a date object (use first day if month/year only)
-                    if fmt == "%Y":
-                        return datetime.date(dt.year, 1, 1)
-                    if fmt == "%Y-%m":
-                        return datetime.date(dt.year, dt.month, 1)
-                    return datetime.date(dt.year, dt.month, dt.day)
-                except Exception:
-                    continue
-            return None
-
-        def add_months(d: datetime.date, months_to_add: int) -> datetime.date:
-            # Add months to a date while keeping day within month bounds
-            total_month = d.month - 1 + months_to_add
-            new_year = d.year + total_month // 12
-            new_month = total_month % 12 + 1
-            last_day = calendar.monthrange(new_year, new_month)[1]
-            new_day = min(d.day, last_day)
-            return datetime.date(new_year, new_month, new_day)
-
-        rows = []
-        if months is None:
-            # fallback behavior: current year retirees (preserve previous behavior)
-            current_year = today.year
-            for row in all_rows:
-                rd = parse_retirement_date(row[EMPLOYEE_FIELDS.index('retirement_date')])
-                if rd and rd.year == current_year:
-                    rows.append(row)
-        else:
-            end_date = add_months(today, months)
-            for row in all_rows:
-                rd = parse_retirement_date(row[EMPLOYEE_FIELDS.index('retirement_date')])
-                if rd and today <= rd <= end_date:
-                    rows.append(row)
+        c.execute(f"""
+            SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee
+            WHERE retirement_date IS NOT NULL
+              AND retirement_date != ''
+              AND date(retirement_date) BETWEEN ? AND ?
+            ORDER BY date(retirement_date)
+        """, (today.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
+        rows = c.fetchall()
 
         if not rows:
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
@@ -396,30 +341,7 @@ class DashboardTab(QWidget):
         )
         if not file_path:
             return
-        
-        # Prepare background image as base64 (only if file and config exist and are valid)
-        bg_url = None
-        first_line_header = ""
-        second_line_header = ""
-        bg_path = os.path.join(os.getcwd(), 'masar-bg.png')
-        cfg_path = os.path.join(os.getcwd(), 'config.json')
-        if os.path.isfile(cfg_path):
-            try:
-                import json
-                with open(cfg_path, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                first_line_header = cfg.get('firstLineHeader', "")
-                second_line_header = cfg.get('secondLineHeader', "")
-            except Exception:
-                first_line_header = ""
-                second_line_header = ""
-        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
-            try:
-                bg_bytes = process_bg_image(bg_path, cfg_path)
-                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
-                bg_url = f"data:image/png;base64,{bg_b64}"
-            except Exception:
-                bg_url = None
+
         html = f"""
         <html lang="ar">
         <head>
@@ -433,7 +355,6 @@ class DashboardTab(QWidget):
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 9px;
-                    {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
                     border-collapse: collapse;
@@ -450,18 +371,17 @@ class DashboardTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
-                /* light rows should be transparent so the PDF background shows through */
                 tr:nth-child(odd) {{
-                    background-color: transparent;
+                    background-color: #ffffff;
                 }}
                 tr:nth-child(even) {{
                     background-color: #f2f2f2;
                 }}
                 @page {{
                     size: A4 landscape;
-                    margin: 1cm 1cm 2cm 1cm; /* extra bottom margin for footer */
+                    margin: 1cm 1cm 2cm 1cm;
                     @bottom-center {{
-                        content: counter(page) "/" counter(pages);
+                        content: "الصفحة " counter(page) " من " counter(pages);
                         font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                         font-size: 12px;
                         color: #444;
@@ -470,7 +390,7 @@ class DashboardTab(QWidget):
             </style>
         </head>
         <body>
-            <h2 style="text-align:center;">بيانات الخروج على المعاش</h2>
+            <h2 style="text-align:center;">بيانات الموظفين الذين تاريخ معاشهم خلال {months} شهر القادمة</h2>
             <table dir="rtl">
                 <thead>
                     <tr>
@@ -480,32 +400,25 @@ class DashboardTab(QWidget):
                 <tbody>
         """
 
-        for idx, emp in enumerate(rows):  # or employees
-            row_class = "zebra1" if idx % 2 == 0 else "zebra2"
+        for idx, emp in enumerate(rows):
             serial = idx + 1
-            html += f'<tr class="{row_class}"><td>{serial}</td>' + ''.join(
-                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
-            ) + '</tr>'
+            html += f'<tr><td>{serial}</td>'
+            for i, f in enumerate(EMPLOYEE_FIELDS):
+                val = emp[i] if emp[i] else ""
+                html += f'<td>{val}</td>'
+            html += '</tr>'
 
         html += """
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
 
         try:
-            css = CSS(string="""
-                @page { 
-                      size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
-                        @top-right {
-                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
-                            font-size: 15px;
-                            color: #1976d2;
-                            text-align: right;
-                            white-space: pre;
-                      }
-            """)
+            css = CSS(string='''
+                @page { size: A4 landscape; margin: 1cm 1cm 2cm 1cm; }
+            ''')
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير القائمة بنجاح كملف PDF.")
         except Exception as e:
@@ -1141,7 +1054,7 @@ class EmployeeTab(QWidget):
         fields2 = EMPLOYEE_FIELDS[half:]
         # Add leading Arabic serial column 'م'
         headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-
+        headers2 = [AR_LABELS[f] for f in fields2]
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_{now}.pdf"
@@ -1207,7 +1120,7 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
-                /* light rows transparent so background/print paper shows through */
+                /* light rows transparent so the PDF background shows through */
                 tr.zebra1 {{ background-color: transparent; }}
                 tr.zebra2 {{ background-color: #f2f2f2; }}
                 @page {{
@@ -1357,13 +1270,14 @@ class EmployeeTab(QWidget):
                 }}
                 @page {{
                     size: A4 landscape;
-                    margin: 1cm 1cm 1.5cm 1cm; /* extra bottom margin for footer */
-                    @bottom-center {{
-                        content: counter(page) "/" counter(pages);
-                        font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                        font-size: 12px;
-                        color: #444;
-                    }}
+                    margin: 1cm 0.5cm 1.5cm 0.5cm;
+                    @top-right {{
+                        content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                        font-size: 15px;
+                        color: #1976d2;
+                        text-align: right;
+                        white-space: pre;
+                  }}
                 }}
             </style>
         </head>
@@ -1397,7 +1311,7 @@ class EmployeeTab(QWidget):
                 @page { 
                       size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
                         @top-right {
-                            content: '{first_line_header.replace("'", "\\'")}\\A{second_line_header.replace("'", "\\'")}';
+                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
                             font-size: 15px;
                             color: #1976d2;
                             text-align: right;
