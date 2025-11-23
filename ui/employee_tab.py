@@ -159,7 +159,7 @@ class EmployeeTab(QWidget):
             self.table.insertRow(row_idx)
             for col_idx, val in enumerate(row[1:]):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(val)))
-            # self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
+            self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
 
     def on_row_select(self, row, col):
         """
