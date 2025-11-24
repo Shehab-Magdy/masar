@@ -212,7 +212,6 @@ class MasarMainWindow(QMainWindow):
             # Class may be defined later in file; adding tab will work after import
             pass
 
-
 class DashboardTab(QWidget):
     def __init__(self, conn):
         super().__init__()
@@ -1410,7 +1409,6 @@ class EmployeeTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء تصدير التقرير: {e}")
 
-
 class CorrespondenceTab(QWidget):
     """Tab for managing correspondence (المراسلات) with full CRUD, search, and PDF export."""
     def __init__(self, conn):
@@ -2006,7 +2004,6 @@ class CorrespondenceTab(QWidget):
             QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء التصدير: {e}")
-
 
 if __name__ == "__main__":
     init_db()
