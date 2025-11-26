@@ -763,13 +763,6 @@ class EmployeeTab(QWidget):
             css = CSS(string="""
                 @page { 
                       size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm;
-                        @top-right {
-                            content: '""" + first_line_header + """\\A""" + second_line_header + """';
-                            font-size: 15px;
-                            color: #1976d2;
-                            text-align: right;
-                            white-space: pre;
-                      }
             """)
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
