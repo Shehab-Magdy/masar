@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QCalendarWidget
-from PyQt5.QtGui import QTextCharFormat, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextCharFormat, QColor, QFont
+from PyQt5.QtCore import Qt, QDate
 
 class CustomWeekendCalendar(QCalendarWidget):
     def __init__(self, parent=None):
@@ -11,35 +11,63 @@ class CustomWeekendCalendar(QCalendarWidget):
         
 
     def highlight_weekends(self):
-        # Example: Friday (5) and Saturday (6) as weekends
+        # --- Weekend text color (Friday + Saturday) ---
         weekend_format = QTextCharFormat()
-        # weekend_format.setBackground(QColor("#ffeaea"))
-        weekend_format.setForeground(QColor("#d32f2f"))
+        weekend_format.setForeground(QColor("#D9534F"))  # soft red
         for day in [Qt.DayOfWeek.Friday, Qt.DayOfWeek.Saturday]:
             self.setWeekdayTextFormat(day, weekend_format)
-        
+
+        # --- Weekday text color ---
         weekday_format = QTextCharFormat()
-        weekday_format.setForeground(QColor("#ffeaea"))
-        for day in [Qt.DayOfWeek.Sunday, Qt.DayOfWeek.Monday, Qt.DayOfWeek.Tuesday, Qt.DayOfWeek.Wednesday, Qt.DayOfWeek.Thursday]:
+        weekday_format.setForeground(QColor("#1D4E89"))  # Masar navy
+        for day in [
+            Qt.DayOfWeek.Sunday, Qt.DayOfWeek.Monday, Qt.DayOfWeek.Tuesday,
+            Qt.DayOfWeek.Wednesday, Qt.DayOfWeek.Thursday
+        ]:
             self.setWeekdayTextFormat(day, weekday_format)
-        
+
+        # --- Highlight today's date ---
+        today_format = QTextCharFormat()
+        today_format.setForeground(QColor("#1D4E89"))
+        today_format.setBackground(QColor("#DCE7FF"))
+        today_format.setFontWeight(QFont.Bold)
+        self.setDateTextFormat(QDate.currentDate(), today_format)
+
+        # --- Apply stylesheet for hover, rounded cells, etc. ---
         self.setStyleSheet("""
             QCalendarWidget QWidget {
-                background-color: #2c2c2c;
-                color: #ffeaea;
+                background-color: #F5F7FA;
+                color: #1D4E89;
             }
+
             QCalendarWidget QAbstractItemView:enabled {
-                background-color: #424242;
-                color: #ffeaea;
-                selection-background-color: #616161;
-                selection-color: #ffeaea;
+                background-color: #FFFFFF;
+                color: #1D4E89;
+                selection-background-color: #3E7BFA;
+                selection-color: #FFFFFF;
+                border-radius: 6px;
             }
+
+            /* Hover Effect */
+            QCalendarWidget QAbstractItemView:item:hover {
+                background-color: #E3ECFF;
+                border-radius: 6px;
+            }
+
+            /* Navigation buttons */
             QCalendarWidget QToolButton {
-                background-color: #616161;
-                color: #ffeaea;
+                background-color: #E9EEF5;
+                color: #1D4E89;
+                border-radius: 6px;
+                padding: 4px;
             }
+
+            QCalendarWidget QToolButton:hover {
+                background-color: #DCE4EF;
+            }
+
             QCalendarWidget QMenu {
-                background-color: #424242;
-                color: #ffeaea;
+                background-color: #FFFFFF;
+                color: #1D4E89;
             }
         """)
