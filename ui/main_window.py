@@ -26,10 +26,6 @@ class MasarMainWindow(QMainWindow):
         self.setWindowIcon(QIcon(resource_path("assets/masar.ico")))
         self.conn = sqlite3.connect(DB_FILE)
         self.tabs = QTabWidget()
-        # center-align tab headers and add some padding so titles look centered
-        self.tabs.setStyleSheet(
-            "QTabBar::tab { text-align: center; qproperty-alignment: AlignCenter; padding-left: 10px; padding-right: 10px; }"
-        )
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(DashboardTab(self.conn), "الإحصائيات")
         self.tabs.addTab(EmployeeTab(self.conn), "الموظفين")
