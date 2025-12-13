@@ -49,6 +49,11 @@ class CorrespondenceTab(QWidget):
         self.search_subject.setPlaceholderText("بحث في الموضوع...")
         search_layout.addWidget(self.search_subject)
         search_layout.addWidget(QLabel("الموضوع:"))
+
+        self.search_fax = QLineEdit()
+        self.search_fax.setPlaceholderText("بحث برقم الفاكس...")
+        search_layout.addWidget(self.search_fax)
+        search_layout.addWidget(QLabel("رقم الفاكس:"))
         
         self.search_to = QDateEdit()
         self.search_to.setCalendarPopup(True)
@@ -511,6 +516,11 @@ class CorrespondenceTab(QWidget):
         if subj:
             clauses.append("subject LIKE ?")
             params.append(f"%{subj}%")
+        
+        fax = self.search_fax.text().strip()
+        if fax:
+            clauses.append("fax_number LIKE ?")
+            params.append(f"%{fax}%")
         where = " AND ".join(clauses)
         self.load_entries(where, tuple(params))
 
@@ -611,6 +621,7 @@ class CorrespondenceTab(QWidget):
     def show_all_entries(self):
         # Clear search fields
         self.search_subject.clear()
+        self.search_fax.clear()
         self.search_from.setDate(datetime.date.today())
         self.search_to.setDate(datetime.date.today())
         # Reload all entries

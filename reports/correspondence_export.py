@@ -39,6 +39,7 @@ def export_correspondence_pdf(parent, ids):
                 cfg = json.load(f)
             first_line_header = cfg.get('firstLineHeader', "")
             second_line_header = cfg.get('secondLineHeader', "")
+            font_size = cfg.get('font-size', 11)
         except Exception:
             first_line_header = ""
             second_line_header = ""
@@ -63,20 +64,26 @@ def export_correspondence_pdf(parent, ids):
         body {{ 
             direction: rtl; 
             font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif; 
-            font-size: 11px; 
+            font-size: {font_size}px; 
             {'background: url("'+bg_url+'") no-repeat center center; background-size: contain;' if bg_url else ''} }}
         table {{ 
             border-collapse: collapse; 
             width: 100%; 
-            table-layout: fixed; 
+            table-layout: auto; 
         }}
         th, td {{ 
             border: 1px solid #888; 
             padding: 6px; 
             vertical-align: top; 
             text-align: right; 
+        }}
+        th:nth-child(-n+6), td:nth-child(-n+6) {{
+            width: 1%;
+            white-space: nowrap;
+        }}
+        th:nth-child(n+7), td:nth-child(n+7) {{
+            white-space: pre-wrap;
             word-break: break-word;
-            white-space: pre-wrap; 
         }}
         th {{ 
             background: #b3d1f7; 
@@ -104,11 +111,11 @@ def export_correspondence_pdf(parent, ids):
             <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
             <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
         </div>
-        <h2 style="text-align:center;">قائمة المراسلات</h2>
+        <h2 style="font-size:15px; text-align:center;">قائمة المراسلات</h2>
         <table dir="rtl">
         <thead>
             <tr>
-            <th>مسلسل</th>
+            <th>م</th>
             <th>رقم الفاكس</th>
             <th>نوع المراسلة</th>
             <th>التاريخ</th>

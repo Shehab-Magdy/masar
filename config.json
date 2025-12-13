@@ -1,7 +1,9 @@
-     {
-       "contrast": 80,
-       "brightness": 70,
-       "opacity": 50,
-       "firstLineHeader": "السطر الاول فى رأس التقرير ",
-       "secondLineHeader": "السطر الثانى فى رأس التقرير "
-     }
+    {
+      "contrast": 80,
+      "brightness": 70,
+      "opacity": 50,
+      "firstLineHeader": "السطر الاول فى رأس التقرير ",
+      "secondLineHeader": "السطر الثانى فى رأس التقرير ",
+      "font-size": 11,
+      "_comment": "Default font-size is 11"
+    }

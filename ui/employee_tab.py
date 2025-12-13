@@ -114,6 +114,11 @@ class EmployeeTab(QWidget):
         self.btn_clear = QPushButton("مسح")
         self.btn_clear.clicked.connect(self.clear_form)
         btns_layout.addWidget(self.btn_clear)
+        
+        self.btn_search_advanced = QPushButton("بحث بالمواصفات")
+        self.btn_search_advanced.clicked.connect(self.search_advanced)
+        btns_layout.addWidget(self.btn_search_advanced)
+
         # Add a button for printing/exporting the filtered list
         self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
         self.btn_export_filtered.clicked.connect(self.export_filtered_pdf)
@@ -582,6 +587,46 @@ class EmployeeTab(QWidget):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(val)))
             self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
 
+    def search_advanced(self):
+        """
+        Searches for employees based on values entered in the form fields.
+        Combines non-empty fields with AND logic using partial matching (LIKE).
+        """
+        self.table.setRowCount(0)
+        c = self.conn.cursor()
+        
+        conditions = []
+        params = []
+        
+        for f in EMPLOYEE_FIELDS:
+            val = self.form_fields[f].text().strip()
+            if val:
+                # Normalize logic for Arabic text if needed
+                norm_val = normalize_arabic(val)
+                conditions.append(f"{f} LIKE ?")
+                params.append(f"%{norm_val}%")
+        
+        if not conditions:
+             # If no criteria entered, maybe load all
+             self.load_employees()
+             return
+
+        query = f"SELECT id, {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE " + " AND ".join(conditions)
+        
+        c.execute(query, tuple(params))
+        rows = c.fetchall()
+        
+        if not rows:
+            QMessageBox.information(self, "بحث", "لا توجد نتائج مطابقة")
+            return
+
+        for row in rows:
+            row_idx = self.table.rowCount()
+            self.table.insertRow(row_idx)
+            for col_idx, val in enumerate(row[1:]):
+                self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(val)))
+            self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
+
     def delete_attachment(self):
         """
         Deletes the selected attachment from the attachments list, database, and disk.
@@ -675,6 +720,7 @@ class EmployeeTab(QWidget):
                     cfg = json.load(f)
                 first_line_header = cfg.get('firstLineHeader', "")
                 second_line_header = cfg.get('secondLineHeader', "")
+                font_size = cfg.get('font-size', 11)
             except Exception:
                 first_line_header = ""
                 second_line_header = ""
@@ -697,7 +743,7 @@ class EmployeeTab(QWidget):
                 body {{
                     direction: rtl;
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 9px;
+                    font-size: {font_size}px;
                     {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
                 }}
                 table {{
@@ -735,7 +781,7 @@ class EmployeeTab(QWidget):
                 <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
                 <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
             </div>
-            <h2 style="text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
+            <h2 style="font-size:15px; text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
             <table dir="rtl">
                 <thead>
                     <tr>

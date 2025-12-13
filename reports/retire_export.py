@@ -73,6 +73,7 @@ def export_retire_pdf(conn, months=6, parent=None):
                 cfg = json.load(f)
             first_line_header = cfg.get('firstLineHeader', "")
             second_line_header = cfg.get('secondLineHeader', "")
+            font_size = cfg.get('font-size', 11)
         except Exception:
             first_line_header = ""
             second_line_header = ""
@@ -96,7 +97,7 @@ def export_retire_pdf(conn, months=6, parent=None):
             body {{
                 direction: rtl;
                 font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                font-size: 9px;
+                font-size: {font_size}px;
                 {'background: url("'+bg_url+'"); background-size: contain; background-repeat: no-repeat; background-position: center center;' if bg_url else ''}
             }}
             table {{
@@ -137,7 +138,7 @@ def export_retire_pdf(conn, months=6, parent=None):
             <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
             <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
         </div>
-        <h2 style="text-align:center;">بيانات الموظفين الذين تاريخ معاشهم خلال {months} أشهر القادمة</h2>
+        <h2 style="font-size:15px; text-align:center;">بيانات الموظفين الذين تاريخ معاشهم خلال {months} أشهر القادمة</h2>
         <table dir="rtl">
             <thead>
                 <tr>
