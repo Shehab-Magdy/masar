@@ -5,11 +5,12 @@ import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QSizePolicy, QGridLayout
+    QMessageBox, QSizePolicy, QGridLayout, QDialog
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
+from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 import mimetypes
 import shutil
 import base64
@@ -118,6 +119,10 @@ class EmployeeTab(QWidget):
         self.btn_search_advanced = QPushButton("بحث بالمواصفات")
         self.btn_search_advanced.clicked.connect(self.search_advanced)
         btns_layout.addWidget(self.btn_search_advanced)
+
+        self.btn_sort = QPushButton("ترتيب مخصص")
+        self.btn_sort.clicked.connect(self.custom_sort_action)
+        btns_layout.addWidget(self.btn_sort)
 
         # Add a button for printing/exporting the filtered list
         self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
@@ -541,10 +546,11 @@ class EmployeeTab(QWidget):
     def clear_form(self):
         """
         Clears all form fields, attachments list widget, attachments list, photo path, photo label, and selected employee ID.
-
+        Also resets the search field and reloads the full employee list (clearing filters/sorts).
         :return: None
         :rtype: NoneType
         """
+        self.search_field.clear()
         for f in EMPLOYEE_FIELDS:
             self.form_fields[f].clear()
         self.attach_list.clear()
@@ -552,6 +558,7 @@ class EmployeeTab(QWidget):
         self.photo_path = None
         self.photo_label.clear()
         self.selected_emp_id = None
+        self.load_employees()
 
     def search_employees(self, search_text):
         """
@@ -626,6 +633,71 @@ class EmployeeTab(QWidget):
             for col_idx, val in enumerate(row[1:]):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(val)))
             self.table.setVerticalHeaderItem(row_idx, QTableWidgetItem(str(row[0])))
+
+
+
+    def custom_sort_action(self):
+        """
+        Opens the MultiColumnSortDialog and sorts the current table contents locally.
+        """
+        # Get column names from headers
+        headers = []
+        for i in range(self.table.columnCount()):
+            item = self.table.horizontalHeaderItem(i)
+            headers.append(item.text() if item else str(i))
+            
+        dlg = MultiColumnSortDialog(headers, self)
+        if dlg.exec() == QDialog.Accepted:
+            criteria = dlg.get_criteria() # list of (col_idx, is_asc)
+            if not criteria:
+                return
+                
+            # Scrape data from table
+            rows_data = []
+            row_count = self.table.rowCount()
+            col_count = self.table.columnCount()
+            
+            for r in range(row_count):
+                row_items = []
+                # Also capture vertical header (ID)
+                vh_item = self.table.verticalHeaderItem(r)
+                row_id = vh_item.text() if vh_item else ""
+                
+                for c in range(col_count):
+                    item = self.table.item(r, c)
+                    txt = item.text() if item else ""
+                    row_items.append(txt)
+                
+                rows_data.append((row_id, row_items))
+                
+            # Sort data
+            # sort is stable, so we can sort in reverse order of criteria
+            # to achieve multi-level sort effect.
+            # However, standard Python sort with key tuple is easier if all same direction.
+            # But here directions might differ.
+            # Stable sort approach: apply sorts from last criterion to first.
+            
+            for col_idx, is_asc in reversed(criteria):
+                # Try to sort numerically if possible, else string
+                def sort_key(row_tuple):
+                    val = row_tuple[1][col_idx]
+                    # basic heuristic for number
+                    # Return tuple (type_priority, value) to safely compare int vs str
+                    # type_priority: 0 for int, 1 for str
+                    # This ensures all ints are compared together and all strs together
+                    if val.isdigit():
+                        return (0, int(val))
+                    return (1, val)
+                
+                rows_data.sort(key=sort_key, reverse=not is_asc)
+                
+            # Re-populate table
+            self.table.setRowCount(0) # clear rows
+            for r_idx, (r_id, r_items) in enumerate(rows_data):
+                self.table.insertRow(r_idx)
+                for c_idx, val in enumerate(r_items):
+                    self.table.setItem(r_idx, c_idx, QTableWidgetItem(val))
+                self.table.setVerticalHeaderItem(r_idx, QTableWidgetItem(r_id))
 
     def delete_attachment(self):
         """
