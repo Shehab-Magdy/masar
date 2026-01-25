@@ -5,7 +5,7 @@ import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QSizePolicy, QGridLayout, QDialog, QGroupBox
+    QMessageBox, QSizePolicy, QGridLayout, QDialog, QGroupBox, QCheckBox, QDialogButtonBox
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
@@ -759,16 +759,36 @@ class EmployeeTab(QWidget):
     def export_filtered_pdf(self):
         """
         Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
-        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
-        - First row: first 9 fields (with labels)
-        - Second row: next 9 fields (with labels)
+        Allows user to select which columns to include.
         """
-        # Gather data from the table (only visible/filtered rows)
+        # Column selection dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("اختيار الأعمدة للتصدير")
+        layout = QVBoxLayout()
+        check_boxes = {}
+        for f in EMPLOYEE_FIELDS:
+            cb = QCheckBox(AR_LABELS[f])
+            cb.setChecked(True)  # default all selected
+            check_boxes[f] = cb
+            layout.addWidget(cb)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        selected_fields = [f for f, cb in check_boxes.items() if cb.isChecked()]
+        if not selected_fields:
+            QMessageBox.warning(self, "تنبيه", "يجب اختيار عمود واحد على الأقل.")
+            return
 
+        # Gather data from the table (only visible/filtered rows)
+        indices = [EMPLOYEE_FIELDS.index(f) for f in selected_fields]
         rows = []
         for row_idx in range(self.table.rowCount()):
             row = []
-            for col_idx in range(self.table.columnCount()):
+            for col_idx in indices:
                 item = self.table.item(row_idx, col_idx)
                 row.append(item.text() if item else "")
             rows.append(row)
@@ -776,13 +796,6 @@ class EmployeeTab(QWidget):
         if not rows:
             QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
             return
-
-        half = (len(EMPLOYEE_FIELDS) + 1) // 2
-        fields1 = EMPLOYEE_FIELDS[:half]
-        fields2 = EMPLOYEE_FIELDS[half:]
-        # Add leading Arabic serial column 'م'
-        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-        headers2 = [AR_LABELS[f] for f in fields2]
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         default_name = f"Employees_{now}.pdf"
@@ -818,6 +831,7 @@ class EmployeeTab(QWidget):
                 bg_url = f"data:image/png;base64,{bg_b64}"
             except Exception:
                 bg_url = None
+        headers = ["م"] + [AR_LABELS[f] for f in selected_fields]
         html = f"""
         <html lang="ar">
         <head>
@@ -841,7 +855,7 @@ class EmployeeTab(QWidget):
                 th, td {{
                     border: 1px solid #888;
                     padding: 6px 4px;
-                    word-break: break-word;
+                    white-space: nowrap;
                     vertical-align: top;
                     text-align: right;
                 }}
@@ -882,7 +896,7 @@ class EmployeeTab(QWidget):
             row_class = "zebra1" if idx % 2 == 0 else "zebra2"
             serial = idx + 1
             html += f'<tr class="{row_class}"><td>{serial}</td>' + ''.join(
-                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(EMPLOYEE_FIELDS))
+                f'<td>{emp[i] if i < len(emp) and emp[i] else ""}</td>' for i in range(len(selected_fields))
             ) + '</tr>'
 
         html += """
