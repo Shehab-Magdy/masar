@@ -27,6 +27,18 @@ def init_db():
             c.execute("ALTER TABLE employee ADD COLUMN insurance_doc TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN relative_name TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN relative_phone TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE employee ADD COLUMN relative_relation TEXT")
+        except sqlite3.OperationalError:
+            pass
         c.execute("""
             CREATE TABLE IF NOT EXISTS attachment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

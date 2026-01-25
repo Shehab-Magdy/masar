@@ -27,13 +27,17 @@ AR_LABELS = {
     "personal_photo": "صورة شخصية",
     "retirement_date": "تاريخ المعاش"
     ,"insurance_doc": "وثيقة التامين"
-    ,"serial": "مسلسل"
+    ,"serial": "مسلسل",
+    "relative_name": "الاسم",
+    "relative_phone": "رقم التليفون",
+    "relative_relation": "الصفة"
 }
 
 EMPLOYEE_FIELDS = [
     "name", "grade", "grade_date", "hire_date", "file_no", "qualification",
     "functional_group", "type_group", "job_title", "department", "current_work",
-    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "insurance_doc", "notes"
+    "birth_date", "retirement_date", "insurance_no", "national_id", "address", "phone", "insurance_doc", "notes",
+    "relative_name", "relative_phone", "relative_relation"
 ]
 
 bg_path = os.path.join(os.getcwd(), 'assets', 'masar-bg.png')

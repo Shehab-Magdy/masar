@@ -5,7 +5,7 @@ import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QSizePolicy, QGridLayout, QDialog
+    QMessageBox, QSizePolicy, QGridLayout, QDialog, QGroupBox
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
@@ -101,34 +101,49 @@ class EmployeeTab(QWidget):
         self.photo_label = QLabel()
         grid_layout.addWidget(self.photo_label, row_offset + 2, 2)
 
-        # Action buttons
-        btns_layout = QHBoxLayout()
+        # Relatives panel
+        relatives_group = QGroupBox("اقارب")
+        relatives_layout = QVBoxLayout()
+        relatives_layout.addWidget(QLabel(AR_LABELS["relative_name"]))
+        relatives_layout.addWidget(self.form_fields["relative_name"])
+        relatives_layout.addWidget(QLabel(AR_LABELS["relative_phone"]))
+        relatives_layout.addWidget(self.form_fields["relative_phone"])
+        relatives_layout.addWidget(QLabel(AR_LABELS["relative_relation"]))
+        relatives_layout.addWidget(self.form_fields["relative_relation"])
+        relatives_group.setLayout(relatives_layout)
+        grid_layout.addWidget(relatives_group, row_offset + 3, 2, 3, 2)
+
+        # Action buttons in two rows
+        btns_layout = QVBoxLayout()
+        btns_row1 = QHBoxLayout()
         self.btn_add = QPushButton("إضافة")
         self.btn_add.clicked.connect(self.add_employee)
-        btns_layout.addWidget(self.btn_add)
+        btns_row1.addWidget(self.btn_add)
         self.btn_edit = QPushButton("تعديل")
         self.btn_edit.clicked.connect(self.edit_employee)
-        btns_layout.addWidget(self.btn_edit)
+        btns_row1.addWidget(self.btn_edit)
         self.btn_delete = QPushButton("حذف")
         self.btn_delete.clicked.connect(self.delete_employee)
-        btns_layout.addWidget(self.btn_delete)
+        btns_row1.addWidget(self.btn_delete)
         self.btn_clear = QPushButton("مسح")
         self.btn_clear.clicked.connect(self.clear_form)
-        btns_layout.addWidget(self.btn_clear)
+        btns_row1.addWidget(self.btn_clear)
+        btns_layout.addLayout(btns_row1)
         
+        btns_row2 = QHBoxLayout()
         self.btn_search_advanced = QPushButton("بحث بالمواصفات")
         self.btn_search_advanced.clicked.connect(self.search_advanced)
-        btns_layout.addWidget(self.btn_search_advanced)
-
+        btns_row2.addWidget(self.btn_search_advanced)
         self.btn_sort = QPushButton("ترتيب مخصص")
         self.btn_sort.clicked.connect(self.custom_sort_action)
-        btns_layout.addWidget(self.btn_sort)
-
+        btns_row2.addWidget(self.btn_sort)
         # Add a button for printing/exporting the filtered list
         self.btn_export_filtered = QPushButton("تصدير النتائج كـ PDF")
         self.btn_export_filtered.clicked.connect(self.export_filtered_pdf)
-        btns_layout.addWidget(self.btn_export_filtered)
-        grid_layout.addLayout(btns_layout, row_offset + 3, 0, 1, 4)
+        btns_row2.addWidget(self.btn_export_filtered)
+        btns_layout.addLayout(btns_row2)
+        
+        grid_layout.addLayout(btns_layout, row_offset + 6, 0, 1, 4)
 
 
         form_widget = QWidget()
