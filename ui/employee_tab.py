@@ -862,6 +862,9 @@ class EmployeeTab(QWidget):
                 th {{
                     background: #b3d1f7;
                 }}
+                tr {{
+                    page-break-inside: avoid;
+                }}
                 /* light rows transparent so the PDF background shows through */
                 tr.zebra1 {{ background-color: transparent; }}
                 tr.zebra2 {{ background-color: #f2f2f2; }}
@@ -997,6 +1000,9 @@ class EmployeeTab(QWidget):
                 }}
                 th {{
                     background: #b3d1f7;
+                }}
+                tr {{
+                    page-break-inside: avoid;
                 }}
                 /* light rows should be transparent so the PDF background shows through */
                 tr:nth-child(odd) {{

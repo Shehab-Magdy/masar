@@ -88,6 +88,9 @@ def export_correspondence_pdf(parent, ids):
         th {{ 
             background: #b3d1f7; 
         }}
+        tr {{
+            page-break-inside: avoid;
+        }}
         tr:nth-child(odd) {{ 
             background-color: transparent; 
         }}

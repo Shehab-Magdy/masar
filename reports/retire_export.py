@@ -115,6 +115,9 @@ def export_retire_pdf(conn, months=6, parent=None):
             th {{
                 background: #b3d1f7;
             }}
+            tr {{
+                page-break-inside: avoid;
+            }}
             tr:nth-child(odd) {{
                 background-color: transparent;
             }}
