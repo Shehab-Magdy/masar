@@ -698,7 +698,9 @@ class CorrespondenceTab(QWidget):
             table {{ 
                 border-collapse: collapse; 
                 width: 100%; 
+                max-width: 100%;
                 table-layout: fixed; 
+                box-sizing: border-box;
             }}
             th, td {{ 
                 border: 1px solid #888; 
@@ -707,10 +709,13 @@ class CorrespondenceTab(QWidget):
                 text-align: right; 
                 word-break: break-word;
                 white-space: pre-wrap; 
+                box-sizing: border-box;
+                overflow-wrap: anywhere;
             }}
             th {{ 
                 background: #b3d1f7; 
             }}
+            .no-wrap {{ white-space: nowrap; }}
             tr {{
                 page-break-inside: avoid;
             }}
@@ -741,9 +746,9 @@ class CorrespondenceTab(QWidget):
           <table dir="rtl">
             <thead>
               <tr>
-                <th>مسلسل</th>
-                <th>رقم الفاكس</th>
-                <th>التاريخ</th>
+                <th class="no-wrap">مسلسل</th>
+                <th class="no-wrap">رقم الفاكس</th>
+                <th class="no-wrap">التاريخ</th>
                 <th>من</th>
                 <th>إلى</th>
                 <th>الموضوع</th>
@@ -756,7 +761,7 @@ class CorrespondenceTab(QWidget):
         for idx, r in enumerate(rows):
             serial = idx + 1
             fax_no, fax_date, from_p, to_p, subj, notes, img = r
-            html += f"<tr><td>{serial}</td><td>{fax_no or ''}</td><td>{fax_date or ''}</td><td>{from_p or ''}</td><td>{to_p or ''}</td><td>{(subj or '')}</td><td>{(notes or '').replace('\n','<br/>')}</td></tr>"
+            html += f"<tr><td class='no-wrap'>{serial}</td><td class='no-wrap'>{fax_no or ''}</td><td class='no-wrap'>{fax_date or ''}</td><td>{from_p or ''}</td><td>{to_p or ''}</td><td>{(subj or '')}</td><td>{(notes or '').replace('\n','<br/>')}</td></tr>"
 
         html += """
             </tbody>
