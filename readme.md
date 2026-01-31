@@ -8,12 +8,22 @@ Masar is a desktop application for managing employee records, attachments, and r
 
 ## Features
 
-- **Employee Management:** Add, edit, delete, and search employee records.
+- **Employee Management:** 
+  - Add, edit, delete, and search employee records.
+  - **New:** Manage relative/emergency contact information.
+  - **Advanced Search:** Filter by name, department, file number, national ID, or specific combinations of fields.
+- **Correspondence Management (المراسلات):** 
+  - Track incoming and outgoing faxes and correspondence.
+  - Attach images to correspondence records.
+  - Search by date range, subject, or fax number.
+  - Export correspondence search results to PDF.
 - **Attachments:** Upload and manage files and personal photos for each employee.
 - **Reports:** Generate basic and comprehensive employee reports.
+- **PDF Export:** 
+  - Export employee reports as RTL, Arabic-compatible PDF files.
+  - **Customizable Columns:** Select exactly which columns to include in the PDF export.
 - **Arabic Interface:** All labels and controls are in Arabic for local usability.
 - **Modern GUI:** Built with PyQt5 for a modern user experience.
-- **PDF Export:** Export employee reports as RTL, Arabic-compatible PDF files using WeasyPrint.
 - **Arabic Text Normalization:** Search and save operations normalize Arabic text for better matching.
 - **Custom App Icon:** Uses `masar.png` or `masar.ico` as the application icon.
 - **Simple Deployment:** Runs as a standalone executable after packaging.
@@ -31,23 +41,9 @@ Masar is a desktop application for managing employee records, attachments, and r
 Install all dependencies with:
 ```sh
 pip install pyqt5 pillow weasyprint
-   ```sh
-   pyinstaller --onefile --windowed --name MasarApp --icon "masar.ico" --win-private-assemblies --win-no-prefer-redirects \
-     --add-data "masar-bg.png;." --add-data "masar.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." \
-     --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" masar.py
-   ```
+```
 
-   Download the source code and place it in your desired directory.
-
-2. **Install Dependencies**
-
-   Open a terminal and run:
-
-   ```sh
-   pip install pyqt5 pillow weasyprint
-   ```
-
-   > **Note:** On some systems, WeasyPrint may require additional system libraries. See [WeasyPrint installation docs](https://weasyprint.readthedocs.io/en/stable/install.html).
+> **Note:** On some systems, WeasyPrint may require additional system libraries. See [WeasyPrint installation docs](https://weasyprint.readthedocs.io/en/stable/install.html).
 
 ---
 
@@ -58,7 +54,7 @@ pip install pyqt5 pillow weasyprint
 To start the application, run:
 
 ```sh
-python masar.py
+python main.py
 ```
 
 ### Packaging as an Executable
@@ -74,7 +70,7 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 2. **Build the Executable**
 
    ```sh
-   pyinstaller --onefile --windowed --icon "masar.ico" --add-data "masar-bg.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" masar.py
+   pyinstaller --onefile --windowed --icon "masar.ico" --add-data "masar-bg.png;." --add-data "Amiri-Regular.ttf;." --add-data "config.json;." --add-data "pdf_bg_utils.py;." --add-data "attachments;attachments" main.py
    ```
 
    The executable will be created in the `dist` directory.
@@ -85,28 +81,38 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 
 4. **App Icon**
 
-   The app uses `masar.png` or `masar.ico` as its icon. Make sure the icon file is present in the same directory as `masar.py`.
+   The app uses `masar.png` or `masar.ico` as its icon. Make sure the icon file is present in the same directory as `main.py`.
 
 ---
 
 ## Application Structure
 
-- **masar.py**: Main application file.
+- **main.py**: Main application file.
 - **masar.db**: SQLite database (created automatically).
 - **attachments/**: Directory for storing uploaded files and photos.
-- **masar.png / masar.ico**: Application icon.
+- **ui/**: Contains UI tabs (Employee, Correspondence, Dashboard).
+- **utils/**: Utility scripts and constants.
 
 ---
 
 ## How to Use
 
-1. **Add Employee:** Fill in the employee details and click "إضافة".
+### Employee Management
+1. **Add Employee:** Fills in employee details (including Relatives info) and click "إضافة".
 2. **Edit Employee:** Select an employee from the list, modify details, and click "تعديل".
 3. **Delete Employee:** Select an employee and click "حذف".
-4. **Search:** Use the search field at the top to filter employees by name, department, file number, or national ID. Search is normalized for Arabic text.
+4. **Search:** 
+   - **Quick Search:** Use the top search bar for Name, Dept, File No, or ID.
+   - **Advanced Search:** Click "بحث بالمواصفات" to filter by multiple specific fields (like Degree, Address, etc.).
 5. **Attachments:** Upload files and personal photos for each employee.
-6. **Reports:** Go to the "التقارير" tab to generate and view reports.
-7. **Export PDF:** Click "تصدير كـ PDF" to export a landscape, RTL, Arabic-compatible PDF report. The file name will be generated as `Employees yyyy-mm-dd hh-mm-ss.pdf`.
+6. **PDF Export:** Click "تصدير النتائج كـ PDF" to select specific columns and generate a report.
+
+### Correspondence (المراسلات)
+1. **Navigate:** Go to the "المراسلات" tab.
+2. **Add Entry:** Enter Fax Number, Date, Subject, Type (Import/Export), and other details. Click "إضافة".
+3. **Attachments:** Upload images related to the fax.
+4. **Search:** Filter by Subject, Fax Number, or Date Range.
+5. **Export:** Click "تصدير النتائج" to save the current view as a PDF.
 
 ---
 
@@ -141,4 +147,4 @@ For support or suggestions, please contact the developer.
 
 ---
 
-**تعليمات البناء بالعربية موجودة في نهاية ملف masar.py**
+**تعليمات البناء بالعربية موجودة في نهاية ملف main.py**
