@@ -21,7 +21,7 @@ def export_retire_pdf(conn, months=6, parent=None):
     last_day = calendar.monthrange(year, month)[1]
     end_date = datetime.date(year, month, last_day)
     
-    headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
+    headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS[:-3]]
 
     # Query all fields for employees retiring within the next N months
     c = conn.cursor()
@@ -154,7 +154,7 @@ def export_retire_pdf(conn, months=6, parent=None):
     for idx, emp in enumerate(rows):
         serial = idx + 1
         html += f'<tr><td>{serial}</td>'
-        for i, f in enumerate(EMPLOYEE_FIELDS):
+        for i, f in enumerate(EMPLOYEE_FIELDS[:-3]):
             val = emp[i] if emp[i] else ""
             html += f'<td>{val}</td>'
         html += '</tr>'
