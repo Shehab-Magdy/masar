@@ -28,9 +28,9 @@ AR_LABELS = {
     "retirement_date": "تاريخ المعاش"
     ,"insurance_doc": "وثيقة التامين"
     ,"serial": "مسلسل",
-    "relative_name": "الاسم",
-    "relative_phone": "رقم التليفون",
-    "relative_relation": "الصفة"
+    "relative_name": "اسم القريب",
+    "relative_phone": "تليفون القريب",
+    "relative_relation": "صلة القرابة"
 }
 
 EMPLOYEE_FIELDS = [
