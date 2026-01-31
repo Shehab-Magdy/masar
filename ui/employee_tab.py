@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
+from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
 import mimetypes
 import shutil
 import base64
@@ -761,24 +762,11 @@ class EmployeeTab(QWidget):
         Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
         Allows user to select which columns to include.
         """
-        # Column selection dialog
-        dialog = QDialog(self)
-        dialog.setWindowTitle("اختيار الأعمدة للتصدير")
-        layout = QVBoxLayout()
-        check_boxes = {}
-        for f in EMPLOYEE_FIELDS:
-            cb = QCheckBox(AR_LABELS[f])
-            cb.setChecked(True)  # default all selected
-            check_boxes[f] = cb
-            layout.addWidget(cb)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
+        # Column selection dialog (moved to ColumnSelectionDialog)
+        dialog = ColumnSelectionDialog(self)
         if dialog.exec_() != QDialog.Accepted:
             return
-        selected_fields = [f for f, cb in check_boxes.items() if cb.isChecked()]
+        selected_fields = dialog.selected_fields()
         if not selected_fields:
             QMessageBox.warning(self, "تنبيه", "يجب اختيار عمود واحد على الأقل.")
             return
