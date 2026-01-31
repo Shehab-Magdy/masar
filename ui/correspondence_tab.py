@@ -665,6 +665,21 @@ class CorrespondenceTab(QWidget):
             except Exception:
                 bg_url = None
 
+        # fetch rows for visible ids from DB (preserve table order)
+        c = self.conn.cursor()
+        rows = []
+        for vid in ids:
+            try:
+                c.execute("SELECT fax_number, fax_date, from_person, to_person, subject, notes, image_path FROM correspondence WHERE id=?", (vid,))
+                r = c.fetchone()
+                if r:
+                    rows.append(r)
+            except Exception:
+                continue
+        if not rows:
+            QMessageBox.warning(self, "تنبيه", "لا توجد نتائج للتصدير")
+            return
+
         # build html
         html = f"""
         <html lang="ar">
