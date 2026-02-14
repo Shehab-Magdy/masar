@@ -83,7 +83,7 @@ def export_correspondence_pdf(parent, ids):
         }}
         th:nth-child(n+7), td:nth-child(n+7) {{
             white-space: pre-wrap;
-            word-break: break-word;
+            overflow-wrap: break-word;
         }}
         th {{ 
             background: #b3d1f7; 

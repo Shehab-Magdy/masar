@@ -108,7 +108,7 @@ def export_retire_pdf(conn, months=6, parent=None):
             th, td {{
                 border: 1px solid #888;
                 padding: 6px 4px;
-                word-break: break-word;
+                overflow-wrap: break-word;
                 vertical-align: top;
                 text-align: right;
             }}

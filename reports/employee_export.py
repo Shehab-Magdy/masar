@@ -55,7 +55,7 @@ class EmployeeReport:
                     border: 1px solid #888;
                     padding: 6px 4px;
                     white-space: pre-wrap;
-                    overflow-wrap: anywhere;
+                    overflow-wrap: break-word;
                     vertical-align: top;
                     text-align: right;
                     box-sizing: border-box;
@@ -170,7 +170,7 @@ class EmployeeReport:
                     border: 1px solid #888;
                     padding: 6px 4px;
                     white-space: pre-wrap;
-                    overflow-wrap: anywhere;
+                    overflow-wrap: break-word;
                     vertical-align: top;
                     text-align: right;
                     box-sizing: border-box;
