@@ -216,3 +216,4 @@ dist.zip
 masar.spec
 *.zip
 *.ini
+.DS_Store

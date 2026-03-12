@@ -1,7 +1,8 @@
 # database/db_manager.py
 import sqlite3
 import os
-from utils.constants import DB_FILE, ATTACHMENTS_DIR, EMPLOYEE_FIELDS
+from utils import constants
+from utils.constants import EMPLOYEE_FIELDS
 
 def init_db():
     """
@@ -9,7 +10,7 @@ def init_db():
     Now includes filetype and upload_date columns in the attachment table.
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(constants.DB_FILE)
         c = conn.cursor()
         # Add insurance_doc and retirement_date to the table creation
         c.execute(f"""
@@ -100,10 +101,10 @@ def init_db():
             pass
         conn.commit()
         conn.close()
-        if not os.path.exists(ATTACHMENTS_DIR):
-            os.makedirs(ATTACHMENTS_DIR)
+        if not os.path.exists(constants.ATTACHMENTS_DIR):
+            os.makedirs(constants.ATTACHMENTS_DIR)
         # ensure faxes attachments folder exists
-        faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
+        faxes_dir = os.path.join(constants.ATTACHMENTS_DIR, 'Faxes')
         if not os.path.exists(faxes_dir):
             os.makedirs(faxes_dir)
     except Exception as e:

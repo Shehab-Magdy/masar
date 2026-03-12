@@ -54,8 +54,11 @@ class EmployeeReport:
                 th, td {{
                     border: 1px solid #888;
                     padding: 6px 4px;
-                    white-space: pre-wrap;
+                    /* constrain to about 10 characters and wrap on spaces */
+                    max-width: 10ch;
+                    white-space: normal;
                     overflow-wrap: break-word;
+                    word-break: normal;
                     vertical-align: top;
                     text-align: right;
                     box-sizing: border-box;
@@ -169,8 +172,11 @@ class EmployeeReport:
                 th, td {{
                     border: 1px solid #888;
                     padding: 6px 4px;
-                    white-space: pre-wrap;
+                    /* constrain to about 10 characters and wrap on spaces */
+                    max-width: 10ch;
+                    white-space: normal;
                     overflow-wrap: break-word;
+                    word-break: normal;
                     vertical-align: top;
                     text-align: right;
                     box-sizing: border-box;
