@@ -77,11 +77,13 @@ def export_correspondence_pdf(parent, ids):
             vertical-align: top; 
             text-align: right; 
         }}
+        /* first six columns shrink-to-fit (nowrap) */
         th:nth-child(-n+6), td:nth-child(-n+6) {{
-            width: 1%;
             white-space: nowrap;
         }}
-        th:nth-child(n+7), td:nth-child(n+7) {{
+        /* notes column should wrap and take remaining space */
+        th:last-child, td:last-child {{
+            width: 100%;
             white-space: pre-wrap;
             overflow-wrap: break-word;
         }}
