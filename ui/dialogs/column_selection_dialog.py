@@ -15,9 +15,12 @@ class ColumnSelectionDialog(QDialog):
         self.setWindowTitle("اختيار الأعمدة للتصدير")
         self.check_boxes = {}
         layout = QVBoxLayout()
-        for f in fields:
+        # Default: select all, but leave the last three columns unchecked
+        # (so the user can opt-in to those extra/export-heavy fields).
+        total = len(fields)
+        for idx, f in enumerate(fields):
             cb = QCheckBox(AR_LABELS.get(f, f))
-            cb.setChecked(True)
+            cb.setChecked(idx < total - 3)
             self.check_boxes[f] = cb
             layout.addWidget(cb)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
