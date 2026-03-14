@@ -77,13 +77,13 @@ def export_correspondence_pdf(parent, ids):
             vertical-align: top; 
             text-align: right; 
         }}
-        /* first six columns shrink-to-fit (nowrap) */
-        th:nth-child(-n+6), td:nth-child(-n+6) {{
+        /* first 5 columns should fit their content and not wrap */
+        th:nth-child(-n+5), td:nth-child(-n+5) {{
             white-space: nowrap;
         }}
-        /* notes column should wrap and take remaining space */
-        th:last-child, td:last-child {{
-            width: 100%;
+        /* last 2 columns grow and wrap as needed */
+        th:nth-last-child(-n+2), td:nth-last-child(-n+2) {{
+            width: auto;
             white-space: pre-wrap;
             overflow-wrap: break-word;
         }}
@@ -91,6 +91,9 @@ def export_correspondence_pdf(parent, ids):
             background: #b3d1f7; 
         }}
         tr {{
+            page-break-inside: avoid;
+        }}
+        tr:last-child {{
             page-break-inside: avoid;
         }}
         tr:nth-child(odd) {{ 
