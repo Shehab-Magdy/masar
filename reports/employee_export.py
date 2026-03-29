@@ -63,8 +63,18 @@ class EmployeeReport:
                     text-align: right;
                     box-sizing: border-box;
                 }}
-                .no-wrap {{ white-space: nowrap; }}
-                td.no-wrap {{ padding-left: 6px; padding-right: 6px; }}
+                .no-wrap {{
+                    white-space: nowrap;
+                    overflow-wrap: normal;
+                    word-break: normal;
+                }}
+                td.no-wrap {{
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    overflow-wrap: normal;
+                    word-break: normal;
+                    max-width: none;
+                }}
                 col.no-wrap {{ width: auto; }}
                 th {{
                     background: #b3d1f7;
@@ -181,8 +191,18 @@ class EmployeeReport:
                     text-align: right;
                     box-sizing: border-box;
                 }}
-                .no-wrap {{ white-space: nowrap; }}
-                td.no-wrap {{ padding-left: 6px; padding-right: 6px; }}
+                .no-wrap {{
+                    white-space: nowrap;
+                    overflow-wrap: normal;
+                    word-break: normal;
+                }}
+                td.no-wrap {{
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    overflow-wrap: normal;
+                    word-break: normal;
+                    max-width: none;
+                }}
                 col.no-wrap {{ width: auto; }}
                 th {{
                     background: #b3d1f7;

@@ -1,7 +1,7 @@
 # ui/dashboard_tab.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox
 import datetime
-# from reports.retire_export import export_retire_pdf  # You will move the PDF export logic here
+from reports.retire_export import export_retire_pdf
 
 class DashboardTab(QWidget):
     def __init__(self, conn):
