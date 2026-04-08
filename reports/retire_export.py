@@ -8,7 +8,21 @@ from utils.constants import AR_LABELS, EMPLOYEE_FIELDS, cfg_path, bg_path
 import base64
 
 from utils.pdf_bg_utils import process_bg_image
-def export_retire_pdf(conn, months=6, parent=None):
+
+def _log_column_max_lengths(column_names, rows, report_name):
+    if not rows:
+        print(f"[Report Debug] {report_name} has no rows.")
+        return
+    print(f"[Report Debug] {report_name} Column Max Lengths:")
+    for col_idx, col_name in enumerate(column_names):
+        max_len = len(str(col_name))
+        for row in rows:
+            if col_idx < len(row):
+                max_len = max(max_len, len(str(row[col_idx])))
+        print(f"- {col_name}: {max_len} chars")
+    print("")
+
+def export_retire_pdf(conn, months=6, parent=None, orientation="landscape", debug=True):
     """
     Export the full data of employees whose retirement date is within the next 'months' months as a PDF,
     using the same columns and design as the main employee export.
@@ -48,8 +62,15 @@ def export_retire_pdf(conn, months=6, parent=None):
             continue
     
     if not rows:
-        QMessageBox.warning(parent, "تنبيه", "لا يوجد بيانات لتصديرها.")
+        QMessageBox.warning(parent, "تنبيه", "لا يوجد بيانات للتصدير.")
         return
+
+    if debug:
+        column_names = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS[:-3]]
+        debug_rows = []
+        for idx, emp in enumerate(rows):
+            debug_rows.append([str(idx + 1)] + ["" if emp[i] is None else str(emp[i]) for i in range(len(EMPLOYEE_FIELDS[:-3]))])
+        _log_column_max_lengths(column_names, debug_rows, "Retirement Report")
 
     now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
     default_name = f"Employees_Retirement_{now}.pdf"
@@ -61,6 +82,9 @@ def export_retire_pdf(conn, months=6, parent=None):
     )
     if not file_path:
         return
+    
+    # Determine page orientation
+    page_size = f"A4 {orientation}"
     
     # Prepare background image as base64 (only if file and config exist and are valid)
     bg_url = None
@@ -103,14 +127,21 @@ def export_retire_pdf(conn, months=6, parent=None):
             table {{
                 border-collapse: collapse;
                 width: 100%;
+                max-width: 100%;
+                table-layout: auto;
+                box-sizing: border-box;
                 margin-bottom: 20px;
             }}
             th, td {{
                 border: 1px solid #888;
                 padding: 6px 4px;
+                max-width: 10ch;
+                white-space: normal;
                 overflow-wrap: break-word;
+                word-break: normal;
                 vertical-align: top;
                 text-align: right;
+                box-sizing: border-box;
             }}
             th {{
                 background: #b3d1f7;
@@ -125,13 +156,22 @@ def export_retire_pdf(conn, months=6, parent=None):
                 background-color: #f2f2f2;
             }}
             @page {{
-                size: A4 landscape;
+                size: {page_size};
                 margin: 1cm 1cm 2cm 1cm;
                 @bottom-center {{
                     content: "الصفحة " counter(page) " من " counter(pages);
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 12px;
                     color: #444;
+                }}
+            }}
+            @page:first {{
+                @bottom-right {{
+                    content: "موجه الى";
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: {font_size}px;
+                    color: #000;
+                    margin-right: 1cm;
                 }}
             }}
         </style>
@@ -167,8 +207,8 @@ def export_retire_pdf(conn, months=6, parent=None):
 """
 
     try:
-        css = CSS(string='''
-            @page { size: A4 landscape; margin: 1cm 0.5cm 1.5cm 0.5cm; }
+        css = CSS(string=f'''
+            @page {{ size: {page_size}; margin: 1cm 0.5cm 1.5cm 0.5cm; }}
         ''')
         HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
         QMessageBox.information(parent, "تم", "تم تصدير القائمة بنجاح كملف PDF.")

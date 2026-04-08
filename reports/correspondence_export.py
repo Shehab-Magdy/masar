@@ -7,7 +7,21 @@ import base64
 from utils.constants import bg_path, cfg_path
 from utils.pdf_bg_utils import process_bg_image
 
-def export_correspondence_pdf(parent, ids):
+def _log_column_max_lengths(column_names, rows, report_name):
+    if not rows:
+        print(f"[Report Debug] {report_name} has no rows.")
+        return
+    print(f"[Report Debug] {report_name} Column Max Lengths:")
+    for col_idx, col_name in enumerate(column_names):
+        max_len = len(str(col_name))
+        for row in rows:
+            if col_idx < len(row):
+                max_len = max(max_len, len(str(row[col_idx])))
+        print(f"- {col_name}: {max_len} chars")
+    print("")
+
+
+def export_correspondence_pdf(parent, ids, orientation="portrait", debug=True):
     if not ids:
         QMessageBox.warning(parent, "تنبيه", "لا توجد نتائج للتصدير")
         return
@@ -22,10 +36,29 @@ def export_correspondence_pdf(parent, ids):
         QMessageBox.warning(parent, "تنبيه", "لا توجد نتائج للتصدير")
         return
 
+    if debug:
+        column_names = ["م", "رقم الفاكس", "نوع المراسلة", "التاريخ", "من", "إلى", "الموضوع", "الملاحظات"]
+        debug_rows = []
+        for idx, r in enumerate(rows):
+            debug_rows.append([
+                str(idx + 1),
+                str(r[1] or ''),
+                str(r[2] or ''),
+                str(r[3] or ''),
+                str(r[4] or ''),
+                str(r[5] or ''),
+                str(r[6] or ''),
+                str(r[7] or '')
+            ])
+        _log_column_max_lengths(column_names, debug_rows, "Correspondence Report")
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
     file_path, _ = QFileDialog.getSaveFileName(parent, "حفظ المراسلات كـ PDF", f"correspondence_{now}.pdf", "PDF Files (*.pdf)")
     if not file_path:
         return
+
+    # Determine page orientation
+    page_size = f"A4 {orientation}"
 
     # Prepare background image as base64 (only if file and config exist and are valid)
     bg_url = None
@@ -103,13 +136,22 @@ def export_correspondence_pdf(parent, ids):
             background-color: #f2f2f2; 
         }}
         @page {{ 
-            size: A4 portrait; 
+            size: {page_size}; 
             margin: 1cm 0.5cm 1.5cm 0.5cm;
             @bottom-center {{
                 content: "الصفحة " counter(page) " من " counter(pages);
                 font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                 font-size: 12px;
                 color: #444;
+            }}
+        }}
+        @page:first {{
+            @bottom-right {{
+                content: "موجه الى";
+                font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                font-size: {font_size}px;
+                color: #000;
+                margin-right: 1cm;
             }}
         }}
         </style>
@@ -149,7 +191,7 @@ def export_correspondence_pdf(parent, ids):
     """
 
     try:
-        css = CSS(string='@page { size: A4 portrait; margin: 1cm; }')
+        css = CSS(string=f'@page {{ size: {page_size}; margin: 1cm; }}')
         HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
         QMessageBox.information(parent, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
     except Exception as e:

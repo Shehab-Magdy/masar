@@ -16,12 +16,12 @@ if __name__ == "__main__":
 تعليمات البناء (Build Instructions):
 
 1. تأكد من تثبيت المتطلبات:
-   pip install pillow
-
+   pip install pyqt5 pillow weasyprint
+   
 2. لحزم التطبيق كملف exe:
    - ثبت pyinstaller: pip install pyinstaller
    - شغل الأمر:
-     pyinstaller --onefile --windowed masar.py
+   pyinstaller --onefile --windowed --icon "assets/icons/masar.ico" --add-data "assets/masar-bg.png;." --add-data "assets/Amiri-Regular.ttf;." --add-data "config.json;." --add-data "utils/pdf_bg_utils.py;." --add-data "attachments;attachments" main.py
 
    سيظهر الملف التنفيذي في مجلد dist.
 

@@ -3,7 +3,7 @@ import os
 import datetime
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHeaderView,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
-    QMessageBox, QTextEdit, QGridLayout, QDateEdit, QListWidgetItem, QComboBox, QSizePolicy
+    QMessageBox, QTextEdit, QGridLayout, QDateEdit, QListWidgetItem, QComboBox, QSizePolicy, QDialog
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
@@ -11,6 +11,7 @@ from weasyprint import HTML, CSS
 import base64
 import time
 from ui.dialogs.ClickableLabel import ClickableLabel
+from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 from utils.arabic_normalizer import normalize_arabic
 from utils.constants import ATTACHMENTS_DIR, bg_path, cfg_path
 from utils.pdf_bg_utils import process_bg_image
@@ -628,6 +629,13 @@ class CorrespondenceTab(QWidget):
         self.load_entries()
     
     def export_visible_results(self):
+        # Show print options dialog, default portrait for correspondence reports
+        print_dialog = PrintOptionsDialog(self, default_landscape=False)
+        if print_dialog.exec_() != QDialog.Accepted:
+            return
+        orientation = "landscape" if print_dialog.is_landscape() else "portrait"
+        page_size = f"A4 {orientation}"
+
         # Get IDs of visible rows from the table's vertical header
         ids = []
         for row in range(self.table.rowCount()):
@@ -646,6 +654,7 @@ class CorrespondenceTab(QWidget):
         bg_url = None
         first_line_header = ""
         second_line_header = ""
+        font_size = 11
 
         if os.path.isfile(cfg_path):
             try:
@@ -654,6 +663,7 @@ class CorrespondenceTab(QWidget):
                     cfg = json.load(f)
                 first_line_header = cfg.get('firstLineHeader', "")
                 second_line_header = cfg.get('secondLineHeader', "")
+                font_size = cfg.get('font-size', 11)
             except Exception:
                 first_line_header = ""
                 second_line_header = ""
@@ -680,6 +690,28 @@ class CorrespondenceTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا توجد نتائج للتصدير")
             return
 
+        # Debug: log max content length per column
+        column_names = ["م", "رقم الفاكس", "التاريخ", "من", "إلى", "الموضوع", "الملاحظات"]
+        debug_rows = []
+        for idx, r in enumerate(rows):
+            debug_rows.append([
+                str(idx + 1),
+                str(r[0] or ''),
+                str(r[1] or ''),
+                str(r[2] or ''),
+                str(r[3] or ''),
+                str(r[4] or ''),
+                str(r[5] or '')
+            ])
+        print("[Report Debug] Correspondence Report Column Max Lengths:")
+        for col_idx, col_name in enumerate(column_names):
+            max_len = len(str(col_name))
+            for row in debug_rows:
+                if col_idx < len(row):
+                    max_len = max(max_len, len(str(row[col_idx])))
+            print(f"- {col_name}: {max_len} chars")
+        print("")
+
         # build html
         html = f"""
         <html lang="ar">
@@ -693,7 +725,7 @@ class CorrespondenceTab(QWidget):
             body {{ 
                 direction: rtl; 
                 font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif; 
-                font-size: 11px; 
+                font-size: {font_size}px; 
                 {'background: url("'+bg_url+'") no-repeat center center; background-size: contain;' if bg_url else ''} }}
             table {{ 
                 border-collapse: collapse; 
@@ -726,13 +758,22 @@ class CorrespondenceTab(QWidget):
                 background-color: #f2f2f2; 
             }}
             @page {{ 
-                size: A4 portrait; 
+                size: {page_size}; 
                 margin: 1cm 0.5cm 1.5cm 0.5cm;
                 @bottom-center {{
                     content: "الصفحة " counter(page) " من " counter(pages);
                     font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
                     font-size: 12px;
                     color: #444;
+                }}
+            }}
+            @page:first {{
+                @bottom-right {{
+                    content: "موجه الى";
+                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
+                    font-size: {font_size}px;
+                    color: #000;
+                    margin-right: 1cm;
                 }}
             }}
           </style>
@@ -771,7 +812,7 @@ class CorrespondenceTab(QWidget):
         """
 
         try:
-            css = CSS(string='@page { size: A4 portrait; margin: 1cm; }')
+            css = CSS(string=f'@page {{ size: {page_size}; margin: 1cm; }}')
             HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
             QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
         except Exception as e:

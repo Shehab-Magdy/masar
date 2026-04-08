@@ -1,7 +1,8 @@
 # ui/dashboard_tab.py
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox, QDialog
 import datetime
 from reports.retire_export import export_retire_pdf
+from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 
 class DashboardTab(QWidget):
     def __init__(self, conn):
@@ -76,6 +77,12 @@ class DashboardTab(QWidget):
         """
         Show a dialog to get the number of upcoming months, validate, and call export_retire_pdf(months).
         """
+        # Show print options dialog
+        print_dialog = PrintOptionsDialog(self)
+        if print_dialog.exec_() != QDialog.Accepted:
+            return
+        orientation = "landscape" if print_dialog.is_landscape() else "portrait"
+
         months, ok = QInputDialog.getInt(
             self,
             "إدخال عدد الأشهر",
@@ -87,4 +94,4 @@ class DashboardTab(QWidget):
         if months < 1:
             QMessageBox.warning(self, "تنبيه", "يرجى إدخال رقم موجب أكبر من الصفر لعدد الأشهر.")
             return
-        export_retire_pdf(self.conn, months)
+        export_retire_pdf(self.conn, months, parent=self, orientation=orientation)

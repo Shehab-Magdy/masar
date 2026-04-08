@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
+from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 import mimetypes
 import shutil
 import base64
@@ -762,6 +763,12 @@ class EmployeeTab(QWidget):
         Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
         Allows user to select which columns to include.
         """
+        # Show print options dialog
+        print_dialog = PrintOptionsDialog(self)
+        if print_dialog.exec_() != QDialog.Accepted:
+            return
+        orientation = "landscape" if print_dialog.is_landscape() else "portrait"
+
         # Column selection dialog (moved to ColumnSelectionDialog)
         dialog = ColumnSelectionDialog(self)
         if dialog.exec_() != QDialog.Accepted:
@@ -830,6 +837,7 @@ class EmployeeTab(QWidget):
             bg_url=bg_url,
             file_path=file_path,
             font_size=font_size,
+            orientation=orientation,
             parent=self
         )
 
@@ -840,6 +848,12 @@ class EmployeeTab(QWidget):
         - First row: first 9 fields (with labels)
         - Second row: next 9 fields (with labels)
         """
+        # Show print options dialog
+        print_dialog = PrintOptionsDialog(self)
+        if print_dialog.exec_() != QDialog.Accepted:
+            return
+        orientation = "landscape" if print_dialog.is_landscape() else "portrait"
+
         c = self.conn.cursor()
         c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
         employees = c.fetchall()
@@ -910,5 +924,6 @@ class EmployeeTab(QWidget):
             bg_url=bg_url,
             file_path=file_path,
             font_size=9,
+            orientation=orientation,
             parent=self
         )
