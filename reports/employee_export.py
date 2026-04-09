@@ -12,17 +12,41 @@ class EmployeeReport:
     no_wrap_fields = {"file_no","grade_date","hire_date","birth_date","retirement_date","insurance_no","national_id","phone","relative_phone"}
 
     @staticmethod
-    def _log_column_max_lengths(column_names, rows, report_name):
+    def _wrap_cell_lines(text, max_length=10):
+        if text is None:
+            return [0]
+        text = str(text).strip()
+        if not text:
+            return [0]
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            if not current:
+                current = word
+            elif len(current) + 1 + len(word) <= max_length:
+                current += " " + word
+            else:
+                lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return [len(line) for line in lines] if lines else [0]
+
+    @staticmethod
+    def _log_column_max_lengths(column_names, rows, report_name, max_line_width=10):
         if not rows:
             print(f"[Report Debug] {report_name} has no rows.")
             return
-        print(f"[Report Debug] {report_name} Column Max Lengths:")
+        # print(f"[Report Debug] {report_name} Column Line Lengths (wrap @ {max_line_width} chars, word-safe):")
         for col_idx, col_name in enumerate(column_names):
-            max_len = len(str(col_name))
-            for row in rows:
+            print(f"- {col_name}:")
+            for row_idx, row in enumerate(rows, start=1):
                 if col_idx < len(row):
-                    max_len = max(max_len, len(str(row[col_idx])))
-            print(f"- {col_name}: {max_len} chars")
+                    line_lengths = EmployeeReport._wrap_cell_lines(row[col_idx], max_line_width)
+                else:
+                    line_lengths = [0]
+                print(f"    row {row_idx}: {line_lengths}")
         print("")
 
     def __init__(self, conn):
