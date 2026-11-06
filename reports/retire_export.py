@@ -53,9 +53,10 @@ def export_retire_pdf(conn, months=6, parent=None, orientation="landscape", debu
     """
     # Calculate date range
     today = datetime.date.today()
-    # Add months to today (handle year wrap)
-    year = today.year + (today.month + months - 1) // 12
-    month = (today.month + months - 1) % 12 + 1
+    # The period includes the current month as its first month (handle year wrap)
+    start_date = today.replace(day=1)
+    year = today.year + (today.month + months - 2) // 12
+    month = (today.month + months - 2) % 12 + 1
     last_day = calendar.monthrange(year, month)[1]
     end_date = datetime.date(year, month, last_day)
     
@@ -80,7 +81,7 @@ def export_retire_pdf(conn, months=6, parent=None, orientation="landscape", debu
                 dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 dt = datetime.datetime.strptime(date_str, "%d/%m/%Y").date()
-            if today <= dt <= end_date:
+            if start_date <= dt <= end_date:
                 rows.append(emp)
         except Exception:
             continue
