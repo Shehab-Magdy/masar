@@ -49,7 +49,7 @@ if __name__ == "__main__":
 2. لحزم التطبيق كملف exe:
    - ثبت pyinstaller: pip install pyinstaller
    - شغل الأمر:
-   pyinstaller --onefile --windowed --icon "assets/icons/masar.ico" --add-data "assets;assets" --add-data "config.json;." --add-data "license.json;." --add-data "utils/pdf_bg_utils.py;." --add-data "attachments;attachments" --hidden-import=cryptography.fernet main.py
+   pyinstaller --onefile --windowed --icon "assets/icons/masar.ico" --add-data "assets;assets" --add-data "config.json;." --add-data "license.json;." --add-data "utils/pdf_bg_utils.py;." --add-data "attachments;attachments" main.py
 
    سيظهر الملف التنفيذي في مجلد dist.
 

@@ -3,26 +3,28 @@ import os
 import hashlib
 import hmac
 import base64
-from cryptography.fernet import Fernet
 import uuid
 import platform
 import subprocess
 
+# Crockford Base32: excludes I, L, O, U to avoid visual ambiguity with 1/1/0/V.
+_B32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_CODE_BYTES = 10  # 80 bits -> 16 base32 chars -> grouped as XXXX-XXXX-XXXX-XXXX
+
 class LicenseManager:
     def __init__(self, license_file='license.json'):
         self.license_file = license_file
-        # Obfuscated keys
-        self.fernet_key = base64.b64decode('NjhyX0tpLTMxVmFjTjB5bmZTTHFYbW1rUXpUVlNUYjlZcFN4dEdOVGxSdz0=')
+        # Obfuscated key
         self.hmac_key = base64.b64decode('HrIJ4BDWQbKGt40uWL6RuBawhB25z7Jm2DhPdmnTdY8=')  # 32 bytes base64
 
-    def get_hardware_id(self) -> str:
-        """Generate hardware fingerprint"""
+    def _collect_fingerprint(self) -> str:
+        """Collect raw hardware fingerprint components"""
         components = []
-        
+
         # MAC Address
         mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) for elements in range(0,8*6,8)][::-1])
         components.append(f"MAC:{mac}")
-        
+
         # OS UUID (if available)
         try:
             if platform.system() == 'Windows':
@@ -42,42 +44,42 @@ class LicenseManager:
                         break
         except:
             pass
-        
+
         # CPU Info
         cpu = platform.processor()
         if cpu:
             components.append(f"CPU:{cpu}")
-        
-        # Concatenate and hash
-        data = '|'.join(components)
-        return hashlib.sha256(data.encode()).hexdigest()
 
-    def encrypt_A(self, data: str) -> str:
-        """Encrypt with Fernet (Method A)"""
-        f = Fernet(self.fernet_key)
-        return f.encrypt(data.encode()).decode()
+        return '|'.join(components)
 
-    def decrypt_A(self, data: str) -> str:
-        """Decrypt with Fernet (Method A)"""
-        f = Fernet(self.fernet_key)
-        return f.decrypt(data.encode()).decode()
+    @staticmethod
+    def _encode_short_code(raw: bytes) -> str:
+        """Encode raw bytes as a short, human-readable grouped code (e.g. XK3F-9QPL-7ZRT-M2CD)"""
+        total_bits = len(raw) * 8
+        num_chars = -(-total_bits // 5)  # ceil(total_bits / 5)
+        value = int.from_bytes(raw, 'big')
+        chars = []
+        for i in range(num_chars - 1, -1, -1):
+            chars.append(_B32_ALPHABET[(value >> (i * 5)) & 0x1f])
+        code = ''.join(chars)
+        return '-'.join(code[i:i + 4] for i in range(0, len(code), 4))
 
-    def encrypt_B(self, data: str) -> str:
-        """Generate activation code with HMAC (Method B)"""
-        h = hmac.new(self.hmac_key, data.encode(), hashlib.sha256)
-        sig = h.hexdigest()
-        return f"{data}|{sig}"
+    @staticmethod
+    def _normalize(code: str) -> str:
+        """Normalize a user/admin-entered code for comparison (strip separators, uppercase)"""
+        return ''.join(ch for ch in code.strip().upper() if ch.isalnum())
 
-    def decrypt_B(self, data: str) -> str:
-        """Verify activation code with HMAC (Method B)"""
-        parts = data.split('|', 1)
-        if len(parts) != 2:
-            raise ValueError("Invalid activation code")
-        hid, sig = parts
-        h = hmac.new(self.hmac_key, hid.encode(), hashlib.sha256)
-        if hmac.compare_digest(h.hexdigest(), sig):
-            return hid
-        raise ValueError("Invalid signature")
+    def get_hardware_id(self) -> str:
+        """Short, human-readable hardware code, e.g. XK3F-9QPL-7ZRT-M2CD"""
+        data = self._collect_fingerprint()
+        digest = hashlib.sha256(data.encode()).digest()[:_CODE_BYTES]
+        return self._encode_short_code(digest)
+
+    def generate_activation_code(self, hardware_id: str) -> str:
+        """Admin-side: sign a hardware code into a short activation code"""
+        normalized = self._normalize(hardware_id)
+        sig = hmac.new(self.hmac_key, normalized.encode(), hashlib.sha256).digest()[:_CODE_BYTES]
+        return self._encode_short_code(sig)
 
     def load_license(self) -> dict:
         """Load license from file"""
@@ -97,24 +99,25 @@ class LicenseManager:
     def validate_license(self) -> bool:
         """Validate existing license"""
         license_data = self.load_license()
-        if 'HID_A' not in license_data:
+        stored_code = license_data.get('activation_code')
+        if not stored_code:
             return False
         try:
-            decrypted_hid = self.decrypt_A(license_data['HID_A'])
             current_hid = self.get_hardware_id()
-            return decrypted_hid == current_hid
+            expected_code = self.generate_activation_code(current_hid)
+            return hmac.compare_digest(self._normalize(expected_code), self._normalize(stored_code))
         except:
             return False
 
     def activate_license(self, activation_code: str) -> bool:
         """Activate license with activation code"""
         try:
-            decrypted_hid = self.decrypt_B(activation_code)
             current_hid = self.get_hardware_id()
-            if decrypted_hid == current_hid:
+            expected_code = self.generate_activation_code(current_hid)
+            if hmac.compare_digest(self._normalize(expected_code), self._normalize(activation_code)):
                 license_data = {
-                    'HID_A': self.encrypt_A(current_hid),
-                    'HID_B': activation_code
+                    'hardware_id': current_hid,
+                    'activation_code': expected_code
                 }
                 self.save_license(license_data)
                 return True

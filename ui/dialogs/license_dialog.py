@@ -30,7 +30,7 @@ class LicenseDialog(QDialog):
         self.hw_edit = QLineEdit()
         self.hw_edit.setReadOnly(True)
         hw_id = self.manager.get_hardware_id()
-        self.hw_edit.setText(self.manager.encrypt_A(hw_id))
+        self.hw_edit.setText(hw_id)
         hw_layout.addWidget(self.hw_edit)
 
         copy_btn = QPushButton("نسخ")
@@ -50,6 +50,7 @@ class LicenseDialog(QDialog):
 
         self.code_edit = QLineEdit()
         self.code_edit.setPlaceholderText("أدخل كود التفعيل هنا")
+        self.code_edit.textChanged.connect(self._format_code_input)
         layout.addWidget(self.code_edit)
 
         # Buttons
@@ -66,6 +67,30 @@ class LicenseDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setLayout(layout)
+
+    def _format_code_input(self, text):
+        """Auto-uppercase and auto-insert dashes every 4 chars as the user types/pastes"""
+        cursor = self.code_edit.cursorPosition()
+        alnum_before = sum(1 for ch in text[:cursor] if ch.isalnum())
+        normalized = ''.join(ch for ch in text.upper() if ch.isalnum())[:16]
+
+        grouped_chars = []
+        new_cursor = 0
+        for i, ch in enumerate(normalized):
+            if i > 0 and i % 4 == 0:
+                grouped_chars.append('-')
+            grouped_chars.append(ch)
+            if i + 1 == alnum_before:
+                new_cursor = len(grouped_chars)
+        if alnum_before >= len(normalized):
+            new_cursor = len(grouped_chars)
+
+        grouped = ''.join(grouped_chars)
+        if grouped != text:
+            self.code_edit.blockSignals(True)
+            self.code_edit.setText(grouped)
+            self.code_edit.setCursorPosition(new_cursor)
+            self.code_edit.blockSignals(False)
 
     def copy_hw_id(self):
         clipboard = QApplication.clipboard()
