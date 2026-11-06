@@ -1,12 +1,19 @@
 # masar.py
+import sys
+import os
+
+# Must run before `ui.main_window` is imported below: it transitively imports
+# `weasyprint` at module load time, which needs to find the Pango/cairo/fontconfig
+# DLLs bundled into the PyInstaller exe (see .github/workflows/build-windows.yml).
+if hasattr(sys, '_MEIPASS'):
+    os.environ.setdefault('WEASYPRINT_DLL_DIRECTORIES', sys._MEIPASS)
+
 from PyQt5.QtWidgets import QApplication, QDialog
 from PyQt5.QtGui import QFontDatabase
 from ui.main_window import MasarMainWindow
 from ui.dialogs.license_dialog import LicenseDialog
 from database.db_manager import init_db
 from utils.license_core import LicenseManager
-import sys
-import os
 import shutil
 import platform
 import ctypes

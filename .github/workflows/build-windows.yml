@@ -24,16 +24,31 @@ jobs:
       - name: Run tests
         run: pytest test_masar.py -q
 
+      - name: Install Pango (WeasyPrint's native dependency on Windows)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-pango
+          update: true
+          location: C:\
+
       - name: Build exe
-        run: >
-          pyinstaller --onefile --windowed
-          --icon "assets/icons/masar.ico"
-          --add-data "assets;assets"
-          --add-data "config.json;."
-          --add-data "license.json;."
-          --add-data "utils/pdf_bg_utils.py;."
-          --hidden-import=cryptography.fernet
-          main.py
+        shell: pwsh
+        run: |
+          $pyArgs = @(
+            "--onefile", "--windowed",
+            "--icon", "assets/icons/masar.ico",
+            "--add-data", "assets;assets",
+            "--add-data", "config.json;.",
+            "--add-data", "license.json;.",
+            "--add-data", "utils/pdf_bg_utils.py;.",
+            "--add-data", "attachments;attachments"
+          )
+          # Bundle Pango/cairo/fontconfig/etc DLLs that WeasyPrint loads at runtime via ctypes,
+          # so the exe doesn't depend on the end user having MSYS2/GTK installed.
+          $pyArgs += (Get-ChildItem "C:\msys64\mingw64\bin\*.dll").FullName | ForEach-Object { "--add-binary=${_};." }
+          $pyArgs += "main.py"
+          pyinstaller @pyArgs
 
       - uses: actions/upload-artifact@v4
         with:
