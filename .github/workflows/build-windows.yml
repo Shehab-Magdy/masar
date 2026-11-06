@@ -32,6 +32,10 @@ jobs:
       - name: Build exe
         shell: pwsh
         run: |
+          # attachments/ is gitignored (real employee data) so a fresh checkout never has it;
+          # ship an empty one so the installer starts clean, matching the documented build command.
+          New-Item -ItemType Directory -Force -Path attachments | Out-Null
+
           $pyArgs = @(
             "--onefile", "--windowed",
             "--icon", "assets/icons/masar.ico",
