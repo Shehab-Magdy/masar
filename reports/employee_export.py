@@ -167,7 +167,7 @@ class EmployeeReport:
                 <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
                 <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
             </div>
-            <h2 style="font-size:15px; text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
+            <h2 style="font-size:15px; text-align:center;">بيانات الموظفين المدنيين</h2>
             <table dir="rtl">
                 {colgroup_html}
                 <thead>
@@ -316,7 +316,7 @@ class EmployeeReport:
             </style>
         </head>
         <body>
-            <h2 style="text-align:center;">بيانات الموظفين المدنيين في الورش الرئيسية للطائرات</h2>
+            <h2 style="text-align:center;">بيانات الموظفين المدنيين</h2>
             <table dir="rtl">
                 {colgroup_html}
                 <thead>
