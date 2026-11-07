@@ -24,6 +24,15 @@ class DashboardTab(QWidget):
         layout.addWidget(self.lbl_att)
         layout.addWidget(self.lbl_retire_this_year)
 
+        # Table for employee count by department
+        self.dept_table = QTableWidget()
+        self.dept_table.setColumnCount(2)
+        self.dept_table.setHorizontalHeaderLabels(["القسم", "عدد الموظفين"])
+        self.dept_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.dept_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.dept_table.setSortingEnabled(False)
+        layout.addWidget(self.dept_table)
+
         # Table for employees retiring this year
         self.retire_table = QTableWidget()
         self.retire_table.setColumnCount(3)
@@ -67,6 +76,17 @@ class DashboardTab(QWidget):
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
         self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
         self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
+
+        # Fill the department breakdown table
+        self.dept_table.setRowCount(0)
+        c.execute("""
+            SELECT department, COUNT(*) FROM employee
+            GROUP BY department ORDER BY COUNT(*) DESC
+        """)
+        for row_idx, (department, count) in enumerate(c.fetchall()):
+            self.dept_table.insertRow(row_idx)
+            self.dept_table.setItem(row_idx, 0, QTableWidgetItem(str(department or "")))
+            self.dept_table.setItem(row_idx, 1, QTableWidgetItem(str(count)))
 
         # Fill the retire_table with employees retiring this year
         self.retire_table.setRowCount(0)
