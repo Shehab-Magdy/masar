@@ -105,18 +105,6 @@ class EmployeeTab(QWidget):
         self.photo_label = QLabel()
         grid_layout.addWidget(self.photo_label, row_offset + 2, 2)
 
-        # # Relatives panel
-        # relatives_group = QGroupBox("اقارب")
-        # relatives_layout = QVBoxLayout()
-        # relatives_layout.addWidget(QLabel(AR_LABELS["relative_name"]))
-        # relatives_layout.addWidget(self.form_fields["relative_name"])
-        # relatives_layout.addWidget(QLabel(AR_LABELS["relative_phone"]))
-        # relatives_layout.addWidget(self.form_fields["relative_phone"])
-        # relatives_layout.addWidget(QLabel(AR_LABELS["relative_relation"]))
-        # relatives_layout.addWidget(self.form_fields["relative_relation"])
-        # relatives_group.setLayout(relatives_layout)
-        # grid_layout.addWidget(relatives_group, row_offset + 3, 2, 3, 2)
-
         # Action buttons in two rows
         btns_layout = QVBoxLayout()
         btns_row1 = QHBoxLayout()
@@ -841,93 +829,6 @@ class EmployeeTab(QWidget):
             bg_url=bg_url,
             file_path=file_path,
             font_size=font_size,
-            orientation=orientation,
-            parent=self
-        )
-
-    def export_pdf(self):
-        """
-        Exports all employees as a printable PDF report using WeasyPrint.
-        The table has a split header (two rows of 9 columns), and each employee record is displayed in two rows:
-        - First row: first 9 fields (with labels)
-        - Second row: next 9 fields (with labels)
-        """
-        # Show print options dialog
-        print_dialog = PrintOptionsDialog(self)
-        if print_dialog.exec_() != QDialog.Accepted:
-            return
-        orientation = "landscape" if print_dialog.is_landscape() else "portrait"
-
-        c = self.conn.cursor()
-        c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee")
-        employees = c.fetchall()
-        if not employees:
-            QMessageBox.warning(self, "تنبيه", "لا يوجد بيانات لتصديرها.")
-            return
-
-        half = 9
-        fields1 = EMPLOYEE_FIELDS[:half]
-        fields2 = EMPLOYEE_FIELDS[half:]
-        # leading serial column
-        headers = ["م"] + [AR_LABELS[f] for f in EMPLOYEE_FIELDS]
-        headers2 = [AR_LABELS[f] for f in fields2]
-
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "حفظ التقرير كـ PDF",
-            f"employees_report_{now}.pdf",
-            "PDF Files (*.pdf)"
-        )
-        if not file_path:
-            return
-
-        # Prepare background image as base64 (only if file and config exist and are valid)
-        bg_url = None
-        first_line_header = ""
-        second_line_header = ""
-        if os.path.isfile(cfg_path):
-            try:
-                import json
-                with open(cfg_path, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                first_line_header = cfg.get('firstLineHeader', "")
-                second_line_header = cfg.get('secondLineHeader', "")
-            except Exception:
-                first_line_header = ""
-                second_line_header = ""
-        if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
-            try:
-                bg_bytes = process_bg_image(bg_path, cfg_path)
-                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
-                bg_url = f"data:image/png;base64,{bg_b64}"
-            except Exception:
-                bg_url = None
-        # fields that should not wrap (numbers & dates)
-        no_wrap_fields = {"file_no","grade_date","hire_date","birth_date","retirement_date","insurance_no","national_id","phone","relative_phone"}
-        # build headers html with classes
-        headers_html = ''
-        headers_html += '<th class="no-wrap">م</th>'
-        for f in EMPLOYEE_FIELDS:
-            cls = ' class="no-wrap"' if f in no_wrap_fields else ''
-            headers_html += f'<th{cls}>' + AR_LABELS[f] + '</th>'
-        # build colgroup so no-wrap cols can shrink to content
-        colgroup_html = '<colgroup>'
-        colgroup_html += '<col class="no-wrap" />'  # serial
-        for f in EMPLOYEE_FIELDS:
-            colgroup_html += '<col class="no-wrap" />' if f in no_wrap_fields else '<col />'
-        colgroup_html += '</colgroup>'
-
-        # delegate full report generation to EmployeeReport
-        from reports.employee_export import EmployeeReport
-        report = EmployeeReport(self.conn)
-        report.generate_full_pdf(
-            employees=employees,
-            first_line_header=first_line_header,
-            second_line_header=second_line_header,
-            bg_url=bg_url,
-            file_path=file_path,
-            font_size=9,
             orientation=orientation,
             parent=self
         )

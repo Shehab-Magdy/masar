@@ -18,7 +18,6 @@ from utils.arabic_normalizer import normalize_arabic
 from utils.constants import ATTACHMENTS_DIR, bg_path, cfg_path
 from utils.file_utils import safe_filename_component
 from utils.pdf_bg_utils import process_bg_image
-from reports.correspondence_export import export_correspondence_pdf
 from ui.dialogs.CustomWeekendCalendar import CustomWeekendCalendar
 
 
@@ -362,27 +361,6 @@ class CorrespondenceTab(QWidget):
         if d > datetime.date.today():
             return False, "التاريخ لا يمكن أن يكون في المستقبل"
         return True, ""
-
-    def _save_image(self, fax_number: str) -> str | None:
-        # legacy single-image saver: keep for compatibility (not used)
-        if not self.temp_images:
-            return None
-        faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
-        if not os.path.exists(faxes_dir):
-            os.makedirs(faxes_dir)
-        # save all temp images and return the first saved path (or None)
-        saved_paths = []
-        for idx, src_path in enumerate(self.temp_images):
-            try:
-                ext = os.path.splitext(src_path)[1]
-                fname = f"{fax_number}_{int(time.time())}_{idx}{ext}"
-                dest = os.path.join(faxes_dir, fname)
-                with open(src_path, 'rb') as src, open(dest, 'wb') as dst:
-                    dst.write(src.read())
-                saved_paths.append(dest)
-            except Exception:
-                continue
-        return saved_paths[0] if saved_paths else None
 
     def _save_images_and_create_attachments(self, correspondence_id: int, fax_number: str):
         """Save all temp images to disk and create rows in correspondence_attachment."""
