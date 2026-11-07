@@ -20,6 +20,7 @@ import subprocess
 from utils.arabic_normalizer import normalize_arabic
 from utils.constants import AR_LABELS, EMPLOYEE_FIELDS, cfg_path, bg_path
 from utils.file_utils import get_employee_folder
+from utils.config_loader import load_report_config
 from utils.pdf_bg_utils import process_bg_image
 
 class EmployeeTab(QWidget):
@@ -797,20 +798,7 @@ class EmployeeTab(QWidget):
         
         # Prepare background image as base64 (only if file and config exist and are valid)
         bg_url = None
-        first_line_header = ""
-        second_line_header = ""
-
-        if os.path.isfile(cfg_path):
-            try:
-                import json
-                with open(cfg_path, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                first_line_header = cfg.get('firstLineHeader', "")
-                second_line_header = cfg.get('secondLineHeader', "")
-                font_size = cfg.get('font-size', 11)
-            except Exception:
-                first_line_header = ""
-                second_line_header = ""
+        first_line_header, second_line_header, font_size = load_report_config()
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
