@@ -19,10 +19,14 @@ class DashboardTab(QWidget):
         self.lbl_dept = QLabel()
         self.lbl_att = QLabel()
         self.lbl_retire_this_year = QLabel()
+        self.lbl_corr_out = QLabel()
+        self.lbl_corr_in = QLabel()
         layout.addWidget(self.lbl_emp)
         layout.addWidget(self.lbl_dept)
         layout.addWidget(self.lbl_att)
         layout.addWidget(self.lbl_retire_this_year)
+        layout.addWidget(self.lbl_corr_out)
+        layout.addWidget(self.lbl_corr_in)
 
         # Table for employee count by department
         self.dept_table = QTableWidget()
@@ -72,10 +76,16 @@ class DashboardTab(QWidget):
             WHERE retirement_date IS NOT NULL AND retirement_date != '' AND substr(retirement_date, 1, 4) = ?
         """, (str(current_year),))
         retire_this_year = c.fetchone()[0]
+        c.execute("SELECT correspondence_type, COUNT(*) FROM correspondence GROUP BY correspondence_type")
+        corr_counts = dict(c.fetchall())
+        corr_out_count = corr_counts.get('صادر', 0)
+        corr_in_count = corr_counts.get('وارد', 0)
         self.lbl_emp.setText(f"عدد الموظفين: {emp_count}")
         self.lbl_dept.setText(f"عدد الأقسام: {dept_count}")
         self.lbl_att.setText(f"عدد الملفات المرفوعة: {att_count}")
         self.lbl_retire_this_year.setText(f"عدد الموظفين الذين تاريخ معاشهم في هذا العام: {retire_this_year}")
+        self.lbl_corr_out.setText(f"عدد المراسلات الصادرة: {corr_out_count}")
+        self.lbl_corr_in.setText(f"عدد المراسلات الواردة: {corr_in_count}")
 
         # Fill the department breakdown table
         self.dept_table.setRowCount(0)
