@@ -6,10 +6,12 @@ from ui.main_window import MasarMainWindow
 from ui.dialogs.license_dialog import LicenseDialog
 from database.db_manager import init_db
 from utils.license_core import LicenseManager
+from utils.dialog_utils import install_dialog_centering
 
 if __name__ == "__main__":
     init_db()
     app = QApplication(sys.argv)
+    install_dialog_centering(app)
 
     # License check
     manager = LicenseManager()

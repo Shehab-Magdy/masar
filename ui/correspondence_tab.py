@@ -242,7 +242,9 @@ class CorrespondenceTab(QWidget):
         self.search_to.setCalendarWidget(calendar_to)
 
     def browse_image(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "اختر صور الفاكس", "", "Images (*.png *.jpg *.jpeg)")
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "اختر صور الفاكس", "", "Images (*.png *.jpg *.jpeg)"
+            )
         if not files:
             return
         for f in files:
@@ -631,7 +633,9 @@ class CorrespondenceTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا توجد نتائج للتصدير")
             return
         now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        file_path, _ = QFileDialog.getSaveFileName(self, "حفظ المراسلات كـ PDF", f"correspondence_{now}.pdf", "PDF Files (*.pdf)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "حفظ المراسلات كـ PDF", f"correspondence_{now}.pdf", "PDF Files (*.pdf)"
+            )
         if not file_path:
             return
 

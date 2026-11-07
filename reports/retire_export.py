@@ -63,7 +63,7 @@ def export_retire_pdf(conn, months=6, parent=None, orientation="landscape"):
         "حفظ قائمة المعاش كـ PDF",
         default_name,
         "PDF Files (*.pdf)"
-    )
+        )
     if not file_path:
         return
 

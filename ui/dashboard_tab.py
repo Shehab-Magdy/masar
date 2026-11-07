@@ -51,8 +51,8 @@ class DashboardTab(QWidget):
         lbl_retire_table_title.setStyleSheet("font-size:16px; font-weight:bold; color:#1976d2;")
         layout.addWidget(lbl_retire_table_title)
         self.retire_table = QTableWidget()
-        self.retire_table.setColumnCount(3)
-        self.retire_table.setHorizontalHeaderLabels(["م", "الاسم", "رقم الملف"])
+        self.retire_table.setColumnCount(4)
+        self.retire_table.setHorizontalHeaderLabels(["م", "الاسم", "رقم الملف", "تاريخ المعاش"])
         self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.retire_table.setSortingEnabled(False)
@@ -126,14 +126,16 @@ class DashboardTab(QWidget):
         # Fill the retire_table with employees retiring this year
         self.retire_table.setRowCount(0)
         c.execute("""
-            SELECT name, file_no FROM employee
+            SELECT name, file_no, retirement_date FROM employee
             WHERE retirement_date IS NOT NULL AND retirement_date != '' AND substr(retirement_date, 1, 4) = ?
+            ORDER BY retirement_date
         """, (str(current_year),))
-        for row_idx, (name, file_no) in enumerate(c.fetchall()):
+        for row_idx, (name, file_no, retirement_date) in enumerate(c.fetchall()):
             self.retire_table.insertRow(row_idx)
             self.retire_table.setItem(row_idx, 0, QTableWidgetItem(str(row_idx + 1)))
             self.retire_table.setItem(row_idx, 1, QTableWidgetItem(str(name)))
             self.retire_table.setItem(row_idx, 2, QTableWidgetItem(str(file_no)))
+            self.retire_table.setItem(row_idx, 3, QTableWidgetItem(str(retirement_date)))
 
     def on_print_retire_clicked(self):
         """
@@ -170,7 +172,7 @@ class DashboardTab(QWidget):
             "حفظ نسخة احتياطية",
             default_name,
             "Zip Files (*.zip)"
-        )
+            )
         if not file_path:
             return
         try:

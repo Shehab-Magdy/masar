@@ -383,7 +383,9 @@ class EmployeeTab(QWidget):
         :return: None
         :rtype: NoneType
         """
-        f, _ = QFileDialog.getOpenFileName(self, "اختر صورة شخصية", "", "Images (*.png *.jpg *.jpeg)")
+        f, _ = QFileDialog.getOpenFileName(
+            self, "اختر صورة شخصية", "", "Images (*.png *.jpg *.jpeg)"
+            )
         if f:
             file_no = self.form_fields["file_no"].text()
             if not file_no:
@@ -832,7 +834,7 @@ class EmployeeTab(QWidget):
             "حفظ النتائج كـ PDF",
             default_name,
             "PDF Files (*.pdf)"
-        )
+            )
         if not file_path:
             return
         
