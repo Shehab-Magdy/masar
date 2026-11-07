@@ -396,7 +396,68 @@ class TestCorrespondenceCRUD:
         result = c.fetchone()
         assert result is not None, "Correspondence should be retrieved"
         assert result[0] == 'موضوع', "Subject should match"
-        
+
+        conn.close()
+
+    def test_update_correspondence(self, temp_db):
+        """Test updating correspondence."""
+        db_path, _ = temp_db
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  ('FAX003', '2025-11-17', 'محمد', 'احمد', 'موضوع قديم', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        corr_id = c.lastrowid
+
+        c.execute("UPDATE correspondence SET subject=? WHERE id=?", ('موضوع جديد', corr_id))
+        conn.commit()
+
+        c.execute("SELECT subject FROM correspondence WHERE id=?", (corr_id,))
+        result = c.fetchone()[0]
+        assert result == 'موضوع جديد', "Subject should be updated"
+
+        conn.close()
+
+    def test_delete_correspondence(self, temp_db):
+        """Test deleting correspondence."""
+        db_path, _ = temp_db
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  ('FAX004', '2025-11-17', 'محمد', 'احمد', 'موضوع', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        corr_id = c.lastrowid
+
+        c.execute("DELETE FROM correspondence WHERE id=?", (corr_id,))
+        conn.commit()
+
+        c.execute("SELECT COUNT(*) FROM correspondence WHERE id=?", (corr_id,))
+        count = c.fetchone()[0]
+        assert count == 0, "Correspondence should be deleted"
+
+        conn.close()
+
+    def test_insert_correspondence_attachment(self, temp_db):
+        """Test inserting correspondence attachment."""
+        db_path, _ = temp_db
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  ('FAX005', '2025-11-17', 'محمد', 'احمد', 'موضوع', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        corr_id = c.lastrowid
+
+        c.execute("INSERT INTO correspondence_attachment (correspondence_id, filename, filepath, upload_date) VALUES (?, ?, ?, ?)",
+                  (corr_id, 'image1.jpg', '/path/to/image1.jpg', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+
+        c.execute("SELECT COUNT(*) FROM correspondence_attachment WHERE correspondence_id=?", (corr_id,))
+        count = c.fetchone()[0]
+        assert count == 1, "Attachment should be inserted"
+
         conn.close()
 
 
@@ -468,67 +529,6 @@ def test_init_db_creates_schema_and_dirs(tmp_path, monkeypatch):
     # attachments dir and Faxes subdir should exist
     assert tmp_attach.exists()
     assert (tmp_attach / 'Faxes').exists()
-
-    def test_update_correspondence(self, temp_db):
-        """Test updating correspondence."""
-        db_path, _ = temp_db
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        
-        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  ('FAX003', '2025-11-17', 'محمد', 'احمد', 'موضوع قديم', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        corr_id = c.lastrowid
-        
-        c.execute("UPDATE correspondence SET subject=? WHERE id=?", ('موضوع جديد', corr_id))
-        conn.commit()
-        
-        c.execute("SELECT subject FROM correspondence WHERE id=?", (corr_id,))
-        result = c.fetchone()[0]
-        assert result == 'موضوع جديد', "Subject should be updated"
-        
-        conn.close()
-
-    def test_delete_correspondence(self, temp_db):
-        """Test deleting correspondence."""
-        db_path, _ = temp_db
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        
-        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  ('FAX004', '2025-11-17', 'محمد', 'احمد', 'موضوع', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        corr_id = c.lastrowid
-        
-        c.execute("DELETE FROM correspondence WHERE id=?", (corr_id,))
-        conn.commit()
-        
-        c.execute("SELECT COUNT(*) FROM correspondence WHERE id=?", (corr_id,))
-        count = c.fetchone()[0]
-        assert count == 0, "Correspondence should be deleted"
-        
-        conn.close()
-
-    def test_insert_correspondence_attachment(self, temp_db):
-        """Test inserting correspondence attachment."""
-        db_path, _ = temp_db
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        
-        c.execute("INSERT INTO correspondence (fax_number, fax_date, from_person, to_person, subject, notes, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  ('FAX005', '2025-11-17', 'محمد', 'احمد', 'موضوع', 'ملاحظات', '', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        corr_id = c.lastrowid
-        
-        c.execute("INSERT INTO correspondence_attachment (correspondence_id, filename, filepath, upload_date) VALUES (?, ?, ?, ?)",
-                  (corr_id, 'image1.jpg', '/path/to/image1.jpg', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        
-        c.execute("SELECT COUNT(*) FROM correspondence_attachment WHERE correspondence_id=?", (corr_id,))
-        count = c.fetchone()[0]
-        assert count == 1, "Attachment should be inserted"
-        
-        conn.close()
 
 
 class TestDataIntegrity:
@@ -650,6 +650,85 @@ class TestDateHandling:
         assert parsed.year == now.year
         assert parsed.month == now.month
         assert parsed.day == now.day
+
+
+class TestSafeFilenameComponent:
+    """Test utils.file_utils.safe_filename_component (path-traversal sanitization)."""
+
+    def test_strips_path_separators(self):
+        from utils.file_utils import safe_filename_component
+        result = safe_filename_component("../../etc/passwd")
+        assert "/" not in result
+        assert "\\" not in result
+
+    def test_preserves_safe_characters(self):
+        from utils.file_utils import safe_filename_component
+        assert safe_filename_component("fax-123_A.2024") == "fax-123_A.2024"
+
+    def test_replaces_unsafe_characters(self):
+        from utils.file_utils import safe_filename_component
+        assert safe_filename_component("01/2024:A") == "01_2024_A"
+
+    def test_empty_input_returns_placeholder(self):
+        from utils.file_utils import safe_filename_component
+        assert safe_filename_component("") == "_"
+
+    def test_preserves_arabic_text(self):
+        from utils.file_utils import safe_filename_component
+        result = safe_filename_component("صادر 123")
+        assert "/" not in result
+        assert result != ""
+
+
+class TestGetEmployeeFolder:
+    """Test utils.file_utils.get_employee_folder (path-traversal guard + folder creation)."""
+
+    def test_rejects_non_digit_file_no(self, monkeypatch, tmp_path):
+        from utils import file_utils
+        monkeypatch.setattr(file_utils, 'ATTACHMENTS_DIR', str(tmp_path))
+        with pytest.raises(ValueError):
+            file_utils.get_employee_folder("../../evil")
+
+    def test_rejects_empty_file_no(self, monkeypatch, tmp_path):
+        from utils import file_utils
+        monkeypatch.setattr(file_utils, 'ATTACHMENTS_DIR', str(tmp_path))
+        with pytest.raises(ValueError):
+            file_utils.get_employee_folder("")
+
+    def test_creates_folder_for_valid_file_no(self, monkeypatch, tmp_path):
+        from utils import file_utils
+        monkeypatch.setattr(file_utils, 'ATTACHMENTS_DIR', str(tmp_path))
+        folder = file_utils.get_employee_folder("42")
+        assert os.path.isdir(folder)
+        assert folder == os.path.join(str(tmp_path), "42")
+
+
+class TestLoadReportConfig:
+    """Test utils.config_loader.load_report_config."""
+
+    def test_missing_config_returns_defaults(self, monkeypatch, tmp_path):
+        from utils import config_loader
+        monkeypatch.setattr(config_loader, 'cfg_path', str(tmp_path / "missing.json"))
+        assert config_loader.load_report_config() == ("", "", 11)
+
+    def test_valid_config_returns_values(self, monkeypatch, tmp_path):
+        import json
+        from utils import config_loader
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "firstLineHeader": "H1",
+            "secondLineHeader": "H2",
+            "font-size": 14
+        }), encoding="utf-8")
+        monkeypatch.setattr(config_loader, 'cfg_path', str(cfg_file))
+        assert config_loader.load_report_config() == ("H1", "H2", 14)
+
+    def test_corrupt_config_returns_defaults(self, monkeypatch, tmp_path):
+        from utils import config_loader
+        cfg_file = tmp_path / "bad.json"
+        cfg_file.write_text("{not valid json", encoding="utf-8")
+        monkeypatch.setattr(config_loader, 'cfg_path', str(cfg_file))
+        assert config_loader.load_report_config() == ("", "", 11)
 
 
 if __name__ == "__main__":
