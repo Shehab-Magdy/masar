@@ -1,5 +1,6 @@
 import os
 import datetime
+from html import escape as html_escape
 from PyQt5.QtWidgets import (QFileDialog, QMessageBox
 )
 from weasyprint import HTML, CSS
@@ -182,8 +183,8 @@ def export_correspondence_pdf(parent, ids, orientation="portrait", debug=True):
     </head>
     <body>
         <div style="text-align:right; margin-bottom: 8px;">
-            <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
-            <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
+            <div style="font-size:13px; color:#1976d2;">{html_escape(first_line_header)}</div>
+            <div style="font-size:13px; color:#1976d2;">{html_escape(second_line_header)}</div>
         </div>
         <h2 style="font-size:15px; text-align:center;">قائمة المراسلات</h2>
         <table dir="rtl">
@@ -205,7 +206,16 @@ def export_correspondence_pdf(parent, ids, orientation="portrait", debug=True):
     for idx, r in enumerate(rows):
         serial = idx + 1
         # r[1]=fax_no, r[2]=corr_type, r[3]=fax_date, r[4]=from_p, r[5]=to_p, r[6]=subj, r[7]=notes
-        html += f"<tr><td>{serial}</td><td>{r[1] or ''}</td><td>{r[2] or ''}</td><td>{r[3] or ''}</td><td>{r[4] or ''}</td><td>{r[5] or ''}</td><td>{(r[6] or '')}</td><td>{(r[7] or '').replace('\n','<br/>')}</td></tr>"
+        html += (
+            f"<tr><td>{serial}</td>"
+            f"<td>{html_escape(str(r[1] or ''))}</td>"
+            f"<td>{html_escape(str(r[2] or ''))}</td>"
+            f"<td>{html_escape(str(r[3] or ''))}</td>"
+            f"<td>{html_escape(str(r[4] or ''))}</td>"
+            f"<td>{html_escape(str(r[5] or ''))}</td>"
+            f"<td>{html_escape(str(r[6] or ''))}</td>"
+            f"<td>{html_escape(str(r[7] or '')).replace(chr(10), '<br/>')}</td></tr>"
+        )
 
     html += """
         </tbody>

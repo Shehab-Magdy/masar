@@ -1,5 +1,6 @@
 # reports/retire_export.py
 import datetime, calendar, os
+from html import escape as html_escape
 from weasyprint import HTML, CSS
 from utils.file_utils import resource_path
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
@@ -203,8 +204,8 @@ def export_retire_pdf(conn, months=6, parent=None, orientation="landscape", debu
     </head>
     <body>
         <div style="text-align:right; margin-bottom: 8px;">
-            <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
-            <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
+            <div style="font-size:13px; color:#1976d2;">{html_escape(first_line_header)}</div>
+            <div style="font-size:13px; color:#1976d2;">{html_escape(second_line_header)}</div>
         </div>
         <h2 style="font-size:15px; text-align:center;">بيانات الموظفين الذين تاريخ معاشهم خلال {months} أشهر القادمة</h2>
         <table dir="rtl">
@@ -221,7 +222,7 @@ def export_retire_pdf(conn, months=6, parent=None, orientation="landscape", debu
         html += f'<tr><td>{serial}</td>'
         for i, f in enumerate(EMPLOYEE_FIELDS[:-3]):
             val = emp[i] if emp[i] else ""
-            html += f'<td>{val}</td>'
+            html += f'<td>{html_escape(str(val))}</td>'
         html += '</tr>'
 
     html += """

@@ -1,6 +1,7 @@
 import os
 import datetime
 import base64
+from html import escape as html_escape
 from weasyprint import HTML, CSS
 from PyQt5.QtWidgets import QMessageBox
 from utils.constants import AR_LABELS, EMPLOYEE_FIELDS
@@ -164,8 +165,8 @@ class EmployeeReport:
         </head>
         <body>
             <div style="text-align:right; margin-bottom: 8px;">
-                <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
-                <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
+                <div style="font-size:13px; color:#1976d2;">{html_escape(first_line_header)}</div>
+                <div style="font-size:13px; color:#1976d2;">{html_escape(second_line_header)}</div>
             </div>
             <h2 style="font-size:15px; text-align:center;">بيانات الموظفين المدنيين</h2>
             <table dir="rtl">
@@ -186,7 +187,7 @@ class EmployeeReport:
             for i, f_field in enumerate(selected_fields):
                 val = emp[i] if i < len(emp) and emp[i] else ""
                 cls = ' class="no-wrap"' if f_field in self.no_wrap_fields else ''
-                cells.append(f'<td{cls}>' + str(val) + '</td>')
+                cells.append(f'<td{cls}>' + html_escape(str(val)) + '</td>')
             html += f'<tr class="{row_class}">' + ''.join(cells) + '</tr>'
 
         html += """
@@ -230,6 +231,13 @@ class EmployeeReport:
 
         # Determine page orientation
         page_size = f"A4 {orientation}"
+
+        # CSS single-quoted string: only backslash/quote need escaping here (this
+        # is a @page content value, not HTML, so html_escape() doesn't apply).
+        def _css_str(value):
+            return str(value).replace("\\", "\\\\").replace("'", "\\'")
+        css_first_line_header = _css_str(first_line_header)
+        css_second_line_header = _css_str(second_line_header)
 
         html = f"""
         <html lang="ar">
@@ -297,7 +305,7 @@ class EmployeeReport:
                     size: {page_size};
                     margin: 1cm 0.5cm 1.5cm 0.5cm;
                     @top-right {{
-                        content: '""" + first_line_header + """\\A""" + second_line_header + """';
+                        content: '""" + css_first_line_header + """\\A""" + css_second_line_header + """';
                         font-size: 15px;
                         color: #1976d2;
                         text-align: right;
@@ -334,7 +342,7 @@ class EmployeeReport:
             for i, f_field in enumerate(EMPLOYEE_FIELDS):
                 val = emp[i] if i < len(emp) and emp[i] else ""
                 cls = ' class="no-wrap"' if f_field in self.no_wrap_fields else ''
-                cells.append(f'<td{cls}>' + str(val) + '</td>')
+                cells.append(f'<td{cls}>' + html_escape(str(val)) + '</td>')
             html += f'<tr class="{row_class}">' + ''.join(cells) + '</tr>'
 
         html += """

@@ -1,6 +1,7 @@
 import sys
 import os
 import datetime
+from html import escape as html_escape
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHeaderView,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
     QMessageBox, QTextEdit, QGridLayout, QDateEdit, QListWidgetItem, QComboBox, QSizePolicy, QDialog
@@ -783,8 +784,8 @@ class CorrespondenceTab(QWidget):
         </head>
         <body>
             <div style="text-align:right; margin-bottom: 8px;">
-                <div style="font-size:13px; color:#1976d2;">{first_line_header}</div>
-                <div style="font-size:13px; color:#1976d2;">{second_line_header}</div>
+                <div style="font-size:13px; color:#1976d2;">{html_escape(first_line_header)}</div>
+                <div style="font-size:13px; color:#1976d2;">{html_escape(second_line_header)}</div>
             </div>
           <h2 style="text-align:center;">قائمة المراسلات</h2>
           <table dir="rtl">
@@ -805,7 +806,15 @@ class CorrespondenceTab(QWidget):
         for idx, r in enumerate(rows):
             serial = idx + 1
             fax_no, fax_date, from_p, to_p, subj, notes, img = r
-            html += f"<tr><td class='no-wrap'>{serial}</td><td class='no-wrap'>{fax_no or ''}</td><td class='no-wrap'>{fax_date or ''}</td><td>{from_p or ''}</td><td>{to_p or ''}</td><td>{(subj or '')}</td><td>{(notes or '').replace('\n','<br/>')}</td></tr>"
+            html += (
+                f"<tr><td class='no-wrap'>{serial}</td>"
+                f"<td class='no-wrap'>{html_escape(str(fax_no or ''))}</td>"
+                f"<td class='no-wrap'>{html_escape(str(fax_date or ''))}</td>"
+                f"<td>{html_escape(str(from_p or ''))}</td>"
+                f"<td>{html_escape(str(to_p or ''))}</td>"
+                f"<td>{html_escape(str(subj or ''))}</td>"
+                f"<td>{html_escape(str(notes or '')).replace(chr(10), '<br/>')}</td></tr>"
+            )
 
         html += """
             </tbody>
