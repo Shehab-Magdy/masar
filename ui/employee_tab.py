@@ -16,6 +16,7 @@ from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 import mimetypes
 import shutil
 import base64
+import subprocess
 from utils.arabic_normalizer import normalize_arabic
 from utils.constants import AR_LABELS, EMPLOYEE_FIELDS, cfg_path, bg_path
 from utils.file_utils import get_employee_folder
@@ -257,11 +258,11 @@ class EmployeeTab(QWidget):
         for name, path, _ in self.attachments:
             if name == fname and os.path.exists(path):
                 if sys.platform.startswith('darwin'):
-                    os.system(f'open "{path}"')
+                    subprocess.run(["open", path])
                 elif os.name == 'nt':
                     os.startfile(path)
                 elif os.name == 'posix':
-                    os.system(f'xdg-open "{path}"')
+                    subprocess.run(["xdg-open", path])
                 break
 
     def display_photo(self):

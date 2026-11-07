@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt
 from weasyprint import HTML, CSS
 import base64
 import time
+import subprocess
 from ui.dialogs.ClickableLabel import ClickableLabel
 from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 from utils.arabic_normalizer import normalize_arabic
@@ -611,11 +612,11 @@ class CorrespondenceTab(QWidget):
             return
         try:
             if sys.platform.startswith('darwin'):
-                os.system(f'open "{path}"')
+                subprocess.run(["open", path])
             elif os.name == 'nt':
                 os.startfile(path)
             elif os.name == 'posix':
-                os.system(f'xdg-open "{path}"')
+                subprocess.run(["xdg-open", path])
         except Exception:
             QMessageBox.warning(self, "خطأ", "تعذر فتح الملف في التطبيق الافتراضي")
 
