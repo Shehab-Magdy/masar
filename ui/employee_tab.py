@@ -203,7 +203,7 @@ class EmployeeTab(QWidget):
         c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE id=?", (emp_id,))
         row_data = c.fetchone()
         for idx, f in enumerate(EMPLOYEE_FIELDS):
-            self.form_fields[f].setText(row_data[idx])
+            self.form_fields[f].setText(row_data[idx] or "")
         self.selected_emp_id = emp_id
 
         # --- Load attachments and set photo_path correctly ---
