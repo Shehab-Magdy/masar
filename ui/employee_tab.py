@@ -69,6 +69,7 @@ class EmployeeTab(QWidget):
 
         self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
         self.attach_list = QListWidget()
+        self.attach_list.itemDoubleClicked.connect(self.open_attachment)
         num_fields = len(EMPLOYEE_FIELDS)
         fields_per_col = num_fields // 2 + num_fields % 2  # 9 if 18 fields
 
@@ -217,8 +218,6 @@ class EmployeeTab(QWidget):
             if is_photo:
                 self.photo_path = fpath
         self.display_photo()
-        # Enable double-click to open attachment
-        self.attach_list.itemDoubleClicked.connect(self.open_attachment)
 
     def load_attachments(self, emp_id):
         """
@@ -246,8 +245,6 @@ class EmployeeTab(QWidget):
             if is_photo:
                 self.photo_path = fpath
         self.display_photo()
-        # Enable double-click to open attachment
-        self.attach_list.itemDoubleClicked.connect(self.open_attachment)
 
     def open_attachment(self, item):
         """
