@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QCalendarWidget
 from PyQt5.QtGui import QTextCharFormat, QColor, QFont
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtCore import Qt, QDate, QTimer
 
 class CustomWeekendCalendar(QCalendarWidget):
     def __init__(self, parent=None):
@@ -8,21 +8,36 @@ class CustomWeekendCalendar(QCalendarWidget):
         self.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.setFirstDayOfWeek(Qt.DayOfWeek.Saturday)
         self.highlight_weekends()
-        
+
+    def showEvent(self, event):
+        """
+        Opens on today's page by default. Only kicks in when the field is
+        still at its "unset" value (selectedDate == minimumDate, the sentinel
+        pattern used for optional date fields) so editing an already-set date
+        still opens on that date's own page instead of jumping to today.
+
+        Deferred via a zero-delay timer: the host QDateEdit re-syncs the
+        calendar's displayed page to the selected date as part of its own
+        popup-opening logic, which can run after this showEvent and would
+        otherwise undo setCurrentPage() if called synchronously here.
+        """
+        super().showEvent(event)
+        if self.selectedDate() == self.minimumDate():
+            today = QDate.currentDate()
+            QTimer.singleShot(0, lambda: self.setCurrentPage(today.year(), today.month()))
 
     def highlight_weekends(self):
-        # --- Weekend text color (Friday + Saturday) ---
+        # --- Weekend text color (Friday only) ---
         weekend_format = QTextCharFormat()
         weekend_format.setForeground(QColor("#D9534F"))  # soft red
-        for day in [Qt.DayOfWeek.Friday, Qt.DayOfWeek.Saturday]:
-            self.setWeekdayTextFormat(day, weekend_format)
+        self.setWeekdayTextFormat(Qt.DayOfWeek.Friday, weekend_format)
 
-        # --- Weekday text color ---
+        # --- Weekday text color (Saturday through Thursday) ---
         weekday_format = QTextCharFormat()
         weekday_format.setForeground(QColor("#1D4E89"))  # Masar navy
         for day in [
-            Qt.DayOfWeek.Sunday, Qt.DayOfWeek.Monday, Qt.DayOfWeek.Tuesday,
-            Qt.DayOfWeek.Wednesday, Qt.DayOfWeek.Thursday
+            Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday, Qt.DayOfWeek.Monday,
+            Qt.DayOfWeek.Tuesday, Qt.DayOfWeek.Wednesday, Qt.DayOfWeek.Thursday
         ]:
             self.setWeekdayTextFormat(day, weekday_format)
 

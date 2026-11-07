@@ -13,6 +13,7 @@ from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
 from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
+from ui.dialogs.CustomWeekendCalendar import CustomWeekendCalendar
 import mimetypes
 import shutil
 import base64
@@ -83,6 +84,7 @@ class EmployeeTab(QWidget):
             if f in DATE_FIELDS:
                 w = QDateEdit()
                 w.setCalendarPopup(True)
+                w.setCalendarWidget(CustomWeekendCalendar())
                 w.setDisplayFormat("yyyy-MM-dd")
                 w.setMinimumDate(EMPTY_DATE)
                 w.setSpecialValueText(" ")  # shown instead of the sentinel date -> reads as "empty"
