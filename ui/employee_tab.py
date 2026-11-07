@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLineEdit, QDateEdit, QHBoxLayout, QFileDialog, QListWidget,
     QMessageBox, QSizePolicy, QGridLayout, QDialog, QGroupBox, QCheckBox, QDialogButtonBox
 )
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtGui import QPixmap, QRegExpValidator
+from PyQt5.QtCore import Qt, QDate, QRegExp
 from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
@@ -92,8 +92,10 @@ class EmployeeTab(QWidget):
                 w = QLineEdit()
                 if f == "national_id":
                     w.setPlaceholderText("14 رقم")
+                    w.setValidator(QRegExpValidator(QRegExp(r"^\d{0,14}$"), w))
                 elif f in ("phone", "insurance_no", "file_no"):
                     w.setPlaceholderText("أرقام فقط")
+                    w.setValidator(QRegExpValidator(QRegExp(r"^\d*$"), w))
             self.form_fields[f] = w
         self.attach_list = QListWidget()
         self.attach_list.itemDoubleClicked.connect(self.open_attachment)
