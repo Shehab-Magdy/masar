@@ -29,6 +29,9 @@ DATE_FIELDS = {"grade_date", "hire_date", "birth_date", "retirement_date"}
 # specialValueText, since QDateEdit always holds *some* date otherwise).
 EMPTY_DATE = QDate(1900, 1, 1)
 
+# Fields validate_employee_form() rejects an empty submission for.
+REQUIRED_FIELDS = {"name", "file_no", "national_id"}
+
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
@@ -105,7 +108,10 @@ class EmployeeTab(QWidget):
         for idx, f in enumerate(EMPLOYEE_FIELDS):
             row = idx % fields_per_col
             col = (idx // fields_per_col) * 2
-            label = QLabel(AR_LABELS[f])
+            label_text = AR_LABELS[f]
+            if f in REQUIRED_FIELDS:
+                label_text += ' <span style="color:red;">*</span>'
+            label = QLabel(label_text)
             label.setMinimumWidth(0)
             label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
             self.form_fields[f].setAlignment(Qt.AlignmentFlag.AlignLeft)

@@ -99,6 +99,9 @@ class DashboardTab(QWidget):
         self.lbl_corr_in.setText(f"عدد المراسلات الواردة: {corr_in_count}")
         self.lbl_missing_photo.setText(f"موظفون بدون صورة شخصية: {missing_photo_count}")
         self.lbl_missing_insurance.setText(f"موظفون بدون وثيقة تأمين: {missing_insurance_count}")
+        warning_style = "color: #c0392b; font-weight: bold;"
+        self.lbl_missing_photo.setStyleSheet(warning_style if missing_photo_count > 0 else "")
+        self.lbl_missing_insurance.setStyleSheet(warning_style if missing_insurance_count > 0 else "")
 
         # Fill the department breakdown table
         self.dept_table.setRowCount(0)

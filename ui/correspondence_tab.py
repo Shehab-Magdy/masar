@@ -128,7 +128,7 @@ class CorrespondenceTab(QWidget):
         grid_layout.setVerticalSpacing(8)
 
         # Row 0: رقم الفاكس | نوع المراسلة
-        grid_layout.addWidget(QLabel("رقم الفاكس:"), 0, 0)
+        grid_layout.addWidget(QLabel('رقم الفاكس: <span style="color:red;">*</span>'), 0, 0)
         grid_layout.addWidget(self.form_fields["fax_number"], 0, 1)
         grid_layout.addWidget(QLabel("نوع المراسلة:"), 0, 2)
         grid_layout.addWidget(self.form_fields["correspondence_type"], 0, 3)
@@ -144,7 +144,7 @@ class CorrespondenceTab(QWidget):
         grid_layout.addWidget(self.form_fields["to_person"], 2, 3)
 
         # Row 3: الموضوع (alone, spanning columns 1-3)
-        grid_layout.addWidget(QLabel("الموضوع:"), 3, 0)
+        grid_layout.addWidget(QLabel('الموضوع: <span style="color:red;">*</span>'), 3, 0)
         grid_layout.addWidget(self.form_fields["subject"], 3, 1, 1, 3)
 
         # Row 4: الملاحظات (alone, spanning columns 1-3)
