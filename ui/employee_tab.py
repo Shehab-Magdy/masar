@@ -4,11 +4,11 @@ import os
 import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
+    QTableWidget, QTableWidgetItem, QLineEdit, QDateEdit, QHBoxLayout, QFileDialog, QListWidget,
     QMessageBox, QSizePolicy, QGridLayout, QDialog, QGroupBox, QCheckBox, QDialogButtonBox
 )
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
@@ -22,6 +22,13 @@ from utils.constants import AR_LABELS, EMPLOYEE_FIELDS, cfg_path, bg_path
 from utils.file_utils import get_employee_folder
 from utils.config_loader import load_report_config
 from utils.pdf_bg_utils import process_bg_image
+
+# Employee fields edited as date pickers rather than free-text fields.
+DATE_FIELDS = {"grade_date", "hire_date", "birth_date", "retirement_date"}
+# Sentinel QDate representing "no date entered" (paired with QDateEdit's
+# specialValueText, since QDateEdit always holds *some* date otherwise).
+EMPTY_DATE = QDate(1900, 1, 1)
+
 
 class EmployeeTab(QWidget):
     def __init__(self, conn):
@@ -68,7 +75,22 @@ class EmployeeTab(QWidget):
         grid_layout.setHorizontalSpacing(12)
         grid_layout.setVerticalSpacing(8)
 
-        self.form_fields = {f: QLineEdit() for f in EMPLOYEE_FIELDS}
+        self.form_fields = {}
+        for f in EMPLOYEE_FIELDS:
+            if f in DATE_FIELDS:
+                w = QDateEdit()
+                w.setCalendarPopup(True)
+                w.setDisplayFormat("yyyy-MM-dd")
+                w.setMinimumDate(EMPTY_DATE)
+                w.setSpecialValueText(" ")  # shown instead of the sentinel date -> reads as "empty"
+                w.setDate(EMPTY_DATE)
+                if f != "retirement_date":
+                    # retirement is expected to be in the future; the other
+                    # date fields (grade/hire/birth) never are.
+                    w.setMaximumDate(QDate.currentDate())
+            else:
+                w = QLineEdit()
+            self.form_fields[f] = w
         self.attach_list = QListWidget()
         self.attach_list.itemDoubleClicked.connect(self.open_attachment)
         num_fields = len(EMPLOYEE_FIELDS)
@@ -147,6 +169,24 @@ class EmployeeTab(QWidget):
         self.setLayout(layout)
         self.load_employees()
 
+    def _get_field_value(self, f):
+        """Returns the field's value as a plain string, '' if a date field is unset."""
+        widget = self.form_fields[f]
+        if f in DATE_FIELDS:
+            qdate = widget.date()
+            return "" if qdate == EMPTY_DATE else qdate.toString("yyyy-MM-dd")
+        return normalize_arabic(widget.text())
+
+    def _set_field_value(self, f, value):
+        """Sets the field's value from a plain string (as stored in the DB)."""
+        widget = self.form_fields[f]
+        if f in DATE_FIELDS:
+            qdate = QDate.fromString(value, "yyyy-MM-dd") if value else EMPTY_DATE
+            if not qdate.isValid():
+                qdate = EMPTY_DATE
+            widget.setDate(qdate)
+        else:
+            widget.setText(value or "")
 
     def load_employees(self):
         """
@@ -193,7 +233,7 @@ class EmployeeTab(QWidget):
         c.execute(f"SELECT {', '.join(EMPLOYEE_FIELDS)} FROM employee WHERE id=?", (emp_id,))
         row_data = c.fetchone()
         for idx, f in enumerate(EMPLOYEE_FIELDS):
-            self.form_fields[f].setText(row_data[idx] or "")
+            self._set_field_value(f, row_data[idx] or "")
         self.selected_emp_id = emp_id
 
         # --- Load attachments and set photo_path correctly ---
@@ -381,14 +421,6 @@ class EmployeeTab(QWidget):
         national_id = self.form_fields["national_id"].text().strip()
         insurance_no = self.form_fields["insurance_no"].text().strip()
         phone = self.form_fields["phone"].text().strip()
-        date_fields = ["grade_date", "hire_date", "birth_date"]
-        # Add retirement_date for format validation only
-        retirement_date_str = self.form_fields["retirement_date"].text().strip()
-        if retirement_date_str:
-            try:
-                datetime.datetime.strptime(retirement_date_str, "%Y-%m-%d")
-            except Exception:
-                return False, f"صيغة التاريخ غير صحيحة في {AR_LABELS['retirement_date']} (يرجى استخدام YYYY-MM-DD)"
 
         # الاسم: مطلوب
         if not name:
@@ -428,17 +460,13 @@ class EmployeeTab(QWidget):
             return False, "رقم التليفون يجب أن يحتوي على أرقام فقط"
 
         # التواريخ: لا يمكن أن تكون في المستقبل
-        today = datetime.date.today()
-        for field in date_fields:
-            date_str = self.form_fields[field].text().strip()
-            if date_str:
-                try:
-                    # Try parsing as YYYY-MM-DD
-                    date_val = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-                    if date_val > today:
-                        return False, f"{AR_LABELS[field]} لا يمكن أن يكون في المستقبل"
-                except Exception:
-                    return False, f"صيغة التاريخ غير صحيحة في {AR_LABELS[field]} (يرجى استخدام YYYY-MM-DD)"
+        # (the date picker's maximum date already blocks this in the UI for
+        # grade/hire/birth; this is a defense-in-depth check on the data itself)
+        today_qdate = QDate.currentDate()
+        for field in ("grade_date", "hire_date", "birth_date"):
+            qdate = self.form_fields[field].date()
+            if qdate != EMPTY_DATE and qdate > today_qdate:
+                return False, f"{AR_LABELS[field]} لا يمكن أن يكون في المستقبل"
 
         return True, ""
 
@@ -447,7 +475,7 @@ class EmployeeTab(QWidget):
         Adds a new employee to the database, or updates the current one if already selected.
         Prevents duplicate records using 'national_id' and 'file_no' as unique identifiers.
         """
-        vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
+        vals = [self._get_field_value(f) for f in EMPLOYEE_FIELDS]
         # Validation
         valid, msg = self.validate_employee_form(self.selected_emp_id)
         if not valid:
@@ -507,7 +535,7 @@ class EmployeeTab(QWidget):
         if not valid:
             QMessageBox.critical(self, "خطأ", msg)
             return
-        vals = [normalize_arabic(self.form_fields[f].text()) for f in EMPLOYEE_FIELDS]
+        vals = [self._get_field_value(f) for f in EMPLOYEE_FIELDS]
         c = self.conn.cursor()
         c.execute(f"UPDATE employee SET {', '.join([f'{f}=?' for f in EMPLOYEE_FIELDS])} WHERE id=?", vals + [self.selected_emp_id])
         c.execute("DELETE FROM attachment WHERE employee_id=?", (self.selected_emp_id,))
@@ -562,7 +590,7 @@ class EmployeeTab(QWidget):
         """
         self.search_field.clear()
         for f in EMPLOYEE_FIELDS:
-            self.form_fields[f].clear()
+            self._set_field_value(f, "")
         self.attach_list.clear()
         self.attachments = []
         self.photo_path = None
