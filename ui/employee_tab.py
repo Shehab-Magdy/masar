@@ -90,6 +90,10 @@ class EmployeeTab(QWidget):
                     w.setMaximumDate(QDate.currentDate())
             else:
                 w = QLineEdit()
+                if f == "national_id":
+                    w.setPlaceholderText("14 رقم")
+                elif f in ("phone", "insurance_no", "file_no"):
+                    w.setPlaceholderText("أرقام فقط")
             self.form_fields[f] = w
         self.attach_list = QListWidget()
         self.attach_list.itemDoubleClicked.connect(self.open_attachment)
