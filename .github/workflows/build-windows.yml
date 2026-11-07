@@ -52,7 +52,17 @@ jobs:
           $pyArgs += "main.py"
           pyinstaller @pyArgs
 
+      - name: Zip exe with password
+        shell: pwsh
+        env:
+          ZIP_PASSWORD: ${{ secrets.ZIP_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:ZIP_PASSWORD)) {
+            throw "ZIP_PASSWORD secret is not set"
+          }
+          & "C:\Program Files\7-Zip\7z.exe" a -tzip -mem=AES256 "-p$env:ZIP_PASSWORD" dist/Masar.zip dist/Masar.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: Masar
-          path: dist/Masar.exe
+          path: dist/Masar.zip
