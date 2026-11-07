@@ -15,6 +15,7 @@ from ui.dialogs.ClickableLabel import ClickableLabel
 from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 from utils.arabic_normalizer import normalize_arabic
 from utils.constants import ATTACHMENTS_DIR, bg_path, cfg_path
+from utils.file_utils import safe_filename_component
 from utils.pdf_bg_utils import process_bg_image
 from reports.correspondence_export import export_correspondence_pdf
 from ui.dialogs.CustomWeekendCalendar import CustomWeekendCalendar
@@ -389,11 +390,12 @@ class CorrespondenceTab(QWidget):
         faxes_dir = os.path.join(ATTACHMENTS_DIR, 'Faxes')
         if not os.path.exists(faxes_dir):
             os.makedirs(faxes_dir)
+        safe_fax_number = safe_filename_component(fax_number)
         c = self.conn.cursor()
         for idx, src_path in enumerate(self.temp_images):
             try:
                 ext = os.path.splitext(src_path)[1]
-                fname = f"{fax_number}_{correspondence_id}_{int(time.time())}_{idx}{ext}"
+                fname = f"{safe_fax_number}_{correspondence_id}_{int(time.time())}_{idx}{ext}"
                 dest = os.path.join(faxes_dir, fname)
                 with open(src_path, 'rb') as src, open(dest, 'wb') as dst:
                     dst.write(src.read())

@@ -298,6 +298,9 @@ class EmployeeTab(QWidget):
         if not file_no:
             QMessageBox.critical(self, "خطأ", "يرجى إدخال رقم الملف أولاً")
             return
+        if not file_no.isdigit():
+            QMessageBox.critical(self, "خطأ", "رقم الملف يجب أن يكون أرقام فقط")
+            return
         emp_folder = get_employee_folder(file_no)
         for f in files:
             orig_fname = os.path.basename(f)
@@ -347,6 +350,9 @@ class EmployeeTab(QWidget):
             file_no = self.form_fields["file_no"].text()
             if not file_no:
                 QMessageBox.critical(self, "خطأ", "يرجى إدخال رقم الملف أولاً")
+                return
+            if not file_no.isdigit():
+                QMessageBox.critical(self, "خطأ", "رقم الملف يجب أن يكون أرقام فقط")
                 return
             emp_folder = get_employee_folder(file_no)
             orig_fname = os.path.basename(f)
