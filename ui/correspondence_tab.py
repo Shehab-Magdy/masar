@@ -465,12 +465,17 @@ class CorrespondenceTab(QWidget):
             QMessageBox.warning(self, "خطأ في البيانات", msg)
             return
         fax_no = self.form_fields["fax_number"].text().strip()
+        # Check for duplicate fax number (excluding this record itself)
+        c = self.conn.cursor()
+        c.execute("SELECT COUNT(*) FROM correspondence WHERE fax_number = ? AND id != ?", (fax_no, self.selected_id))
+        if c.fetchone()[0] > 0:
+            QMessageBox.warning(self, "خطأ", "رقم الفاكس موجود بالفعل ولا يمكن تكراره.")
+            return
         fax_date = self.form_fields["fax_date"].date().toString("yyyy-MM-dd")
         from_p = normalize_arabic(self.form_fields["from_person"].text().strip())
         to_p = normalize_arabic(self.form_fields["to_person"].text().strip())
         subj = normalize_arabic(self.form_fields["subject"].text().strip())
         notes = self.form_fields["notes"].toPlainText().strip()
-        c = self.conn.cursor()
         c.execute(
     "UPDATE correspondence SET fax_number=?, correspondence_type=?, fax_date=?, from_person=?, to_person=?, subject=?, notes=? WHERE id=?",
     (fax_no, self.form_fields["correspondence_type"].currentText(), fax_date, from_p, to_p, subj, notes, self.selected_id)
