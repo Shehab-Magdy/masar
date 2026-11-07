@@ -1,5 +1,6 @@
 # ui/dashboard_tab.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox, QDialog, QFileDialog
+from PyQt5.QtCore import Qt
 import datetime
 import os
 import zipfile
@@ -33,21 +34,29 @@ class DashboardTab(QWidget):
         layout.addWidget(self.lbl_missing_insurance)
 
         # Table for employee count by department
+        lbl_dept_table_title = QLabel("توزيع الموظفين على الأقسام")
+        lbl_dept_table_title.setStyleSheet("font-size:16px; font-weight:bold; color:#1976d2;")
+        layout.addWidget(lbl_dept_table_title)
         self.dept_table = QTableWidget()
         self.dept_table.setColumnCount(2)
         self.dept_table.setHorizontalHeaderLabels(["القسم", "عدد الموظفين"])
         self.dept_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.dept_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.dept_table.setSortingEnabled(False)
+        self.dept_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         layout.addWidget(self.dept_table)
 
         # Table for employees retiring this year
+        lbl_retire_table_title = QLabel("الموظفون الذين تاريخ معاشهم في هذا العام")
+        lbl_retire_table_title.setStyleSheet("font-size:16px; font-weight:bold; color:#1976d2;")
+        layout.addWidget(lbl_retire_table_title)
         self.retire_table = QTableWidget()
         self.retire_table.setColumnCount(3)
         self.retire_table.setHorizontalHeaderLabels(["م", "الاسم", "رقم الملف"])
         self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.retire_table.setSortingEnabled(False)
+        self.retire_table.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         layout.addWidget(self.retire_table)
 
         # Refresh and export buttons
