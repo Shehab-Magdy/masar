@@ -482,16 +482,43 @@ def test_column_selection_dialog_defaults(qapp):
     pytest.skip("PyQt5 dialog mocking not supported in test environment")
 
 
-def test_employee_report_filtered_pdf(tmp_path, monkeypatch):
-    """EmployeeReport should create a filtered PDF file without error."""
-    # Skip due to weasyprint system dependency (libpango) not available in test environment
-    pytest.skip("weasyprint libpango dependencies not available in test environment")
+def test_employee_report_filtered_pdf(tmp_path):
+    """EmployeeReport should create a filtered PDF file without error (fpdf2 backend, no native deps)."""
+    report = EmployeeReport(conn=None)
+    out = tmp_path / "filtered.pdf"
+    ok, msg = report.generate_filtered_pdf(
+        selected_fields=["name", "department"],
+        rows=[["محمد أحمد", "الإدارة"]],
+        first_line_header="",
+        second_line_header="",
+        bg_bytes=None,
+        file_path=str(out),
+        font_size=11,
+        orientation="portrait",
+        parent=None,
+    )
+    assert ok is True
+    assert out.exists()
+    assert out.stat().st_size > 0
 
 
-def test_employee_report_full_pdf(tmp_path):
-    """EmployeeReport full PDF generation should succeed and produce a file."""
-    # Skip due to weasyprint system dependency (libpango) not available in test environment
-    pytest.skip("weasyprint libpango dependencies not available in test environment")
+def test_employee_report_filtered_pdf_escapes_html_like_content(tmp_path):
+    """A field containing HTML-like text should render as literal text, not break the PDF (fpdf2 has no HTML parser at all)."""
+    report = EmployeeReport(conn=None)
+    out = tmp_path / "filtered_payload.pdf"
+    ok, _ = report.generate_filtered_pdf(
+        selected_fields=["name"],
+        rows=[["<script>alert(1)</script>"]],
+        first_line_header="",
+        second_line_header="",
+        bg_bytes=None,
+        file_path=str(out),
+        font_size=11,
+        orientation="portrait",
+        parent=None,
+    )
+    assert ok is True
+    assert out.exists()
 
 
 def test_init_db_creates_schema_and_dirs(tmp_path, monkeypatch):

@@ -1,39 +1,15 @@
 # masar.py
 import sys
-import os
-
-# Must run before `ui.main_window` is imported below: it transitively imports
-# `weasyprint` at module load time, which needs to find the Pango/cairo/fontconfig
-# DLLs bundled into the PyInstaller exe (see .github/workflows/build-windows.yml).
-if hasattr(sys, '_MEIPASS'):
-    os.environ.setdefault('WEASYPRINT_DLL_DIRECTORIES', sys._MEIPASS)
 
 from PyQt5.QtWidgets import QApplication, QDialog
-from PyQt5.QtGui import QFontDatabase
 from ui.main_window import MasarMainWindow
 from ui.dialogs.license_dialog import LicenseDialog
 from database.db_manager import init_db
 from utils.license_core import LicenseManager
-import shutil
-import platform
-import ctypes
 
 if __name__ == "__main__":
     init_db()
     app = QApplication(sys.argv)
-
-    # Install Amiri font if not present on Windows
-    if platform.system() == 'Windows':
-        db = QFontDatabase()
-        if 'Amiri' not in db.families():
-            font_path = os.path.join(sys._MEIPASS if hasattr(sys, '_MEIPASS') else '.', 'assets', 'Amiri-Regular.ttf')
-            dest = r'C:\Windows\Fonts\Amiri-Regular.ttf'
-            if os.path.exists(font_path) and not os.path.exists(dest):
-                try:
-                    shutil.copy(font_path, dest)
-                    ctypes.windll.gdi32.AddFontResourceW(dest)
-                except Exception as e:
-                    print(f"Failed to install Amiri font: {e}")
 
     # License check
     manager = LicenseManager()

@@ -9,14 +9,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QRegExpValidator
 from PyQt5.QtCore import Qt, QDate, QRegExp
-from weasyprint import HTML, CSS
 from ui.dialogs.MultiColumnSortDialog import MultiColumnSortDialog
 from ui.dialogs.column_selection_dialog import ColumnSelectionDialog
 from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 from ui.dialogs.CustomWeekendCalendar import CustomWeekendCalendar
 import mimetypes
 import shutil
-import base64
 import subprocess
 from utils.arabic_normalizer import normalize_arabic
 from utils.constants import AR_LABELS, EMPLOYEE_FIELDS, cfg_path, bg_path
@@ -795,7 +793,7 @@ class EmployeeTab(QWidget):
 
     def export_filtered_pdf(self):
         """
-        Exports the currently filtered list of employees in the table as a printable PDF report using WeasyPrint.
+        Exports the currently filtered list of employees in the table as a printable PDF report.
         Allows user to select which columns to include.
         """
         # Show print options dialog
@@ -838,16 +836,14 @@ class EmployeeTab(QWidget):
         if not file_path:
             return
         
-        # Prepare background image as base64 (only if file and config exist and are valid)
-        bg_url = None
+        # Prepare background watermark image (only if file and config exist and are valid)
+        bg_bytes = None
         first_line_header, second_line_header, font_size = load_report_config()
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
-                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
-                bg_url = f"data:image/png;base64,{bg_b64}"
             except Exception:
-                bg_url = None
+                bg_bytes = None
         # delegate PDF generation to EmployeeReport
         from reports.employee_export import EmployeeReport
         report = EmployeeReport(self.conn)
@@ -856,7 +852,7 @@ class EmployeeTab(QWidget):
             rows=rows,
             first_line_header=first_line_header,
             second_line_header=second_line_header,
-            bg_url=bg_url,
+            bg_bytes=bg_bytes,
             file_path=file_path,
             font_size=font_size,
             orientation=orientation,

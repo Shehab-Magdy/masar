@@ -11,5 +11,4 @@ sys.modules['PyQt5'] = MagicMock()
 sys.modules['PyQt5.QtWidgets'] = MagicMock()
 sys.modules['PyQt5.QtGui'] = MagicMock()
 sys.modules['PyQt5.QtCore'] = MagicMock()
-# Don't mock weasyprint - let tests patch it as needed
 sys.modules['pdf_bg_utils'] = MagicMock()

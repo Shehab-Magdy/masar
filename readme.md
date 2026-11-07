@@ -34,16 +34,14 @@ Masar is a desktop application for managing employee records, attachments, and r
 
 - **Python 3.7+**
 - **PyQt5** (for the GUI)
-- **WeasyPrint** (for PDF export)
+- **fpdf2** + **uharfbuzz** (for PDF export with Arabic text shaping)
 - **Pillow** (for image handling)
 - **SQLite3** (included with Python)
 
 Install all dependencies with:
 ```sh
-pip install pyqt5 pillow weasyprint
+pip install pyqt5 pillow fpdf2 uharfbuzz
 ```
-
-> **Note:** On some systems, WeasyPrint may require additional system libraries. See [WeasyPrint installation docs](https://weasyprint.readthedocs.io/en/stable/install.html).
 
 ---
 
@@ -122,7 +120,7 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 - Attachments are saved in the `attachments` directory.
 - The application interface is in Arabic.
 - Arabic text is normalized before saving and searching for better matching (e.g., "أ" and "ا" are treated the same).
-- The PDF report is generated using WeasyPrint and supports Arabic fonts and right-to-left layout. Make sure you have a suitable Arabic font (like Amiri) available, or adjust the CSS in the code as needed.
+- The PDF report is generated using fpdf2 and supports Arabic fonts and right-to-left layout via its built-in text-shaping engine. The Amiri font (`assets/Amiri-Regular.ttf`) is embedded directly into each PDF, so no system font installation is required.
 
 ---
 
@@ -131,7 +129,7 @@ You can package Masar as a standalone Windows executable using PyInstaller:
 - If you encounter issues with images, ensure Pillow is installed.
 - For database errors, delete `masar.db` to reset (all data will be lost).
 - Always keep the `attachments` folder next to the executable.
-- If PDF export fails, ensure WeasyPrint and its dependencies are installed and that you have a suitable Arabic font.
+- If PDF export fails, ensure `fpdf2` and `uharfbuzz` are installed and that `assets/Amiri-Regular.ttf` is present.
 
 ---
 

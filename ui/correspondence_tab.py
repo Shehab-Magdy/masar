@@ -1,15 +1,12 @@
 import sys
 import os
 import datetime
-from html import escape as html_escape
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHeaderView,
     QTableWidget, QTableWidgetItem, QLineEdit, QHBoxLayout, QFileDialog, QListWidget,
     QMessageBox, QTextEdit, QGridLayout, QDateEdit, QListWidgetItem, QComboBox, QSizePolicy, QDialog
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
-from weasyprint import HTML, CSS
-import base64
 import time
 import subprocess
 from ui.dialogs.ClickableLabel import ClickableLabel
@@ -19,6 +16,7 @@ from utils.constants import ATTACHMENTS_DIR, bg_path, cfg_path
 from utils.file_utils import safe_filename_component
 from utils.config_loader import load_report_config
 from utils.pdf_bg_utils import process_bg_image
+from reports.correspondence_export import export_correspondence_pdf
 from ui.dialogs.CustomWeekendCalendar import CustomWeekendCalendar
 
 
@@ -622,7 +620,6 @@ class CorrespondenceTab(QWidget):
         if print_dialog.exec_() != QDialog.Accepted:
             return
         orientation = "landscape" if print_dialog.is_landscape() else "portrait"
-        page_size = f"A4 {orientation}"
 
         # Get IDs of visible rows from the table's vertical header
         ids = []
@@ -638,16 +635,13 @@ class CorrespondenceTab(QWidget):
         if not file_path:
             return
 
-        # Prepare background image as base64 (only if file and config exist and are valid)
-        bg_url = None
         first_line_header, second_line_header, font_size = load_report_config()
+        bg_bytes = None
         if os.path.isfile(bg_path) and os.path.isfile(cfg_path):
             try:
                 bg_bytes = process_bg_image(bg_path, cfg_path)
-                bg_b64 = base64.b64encode(bg_bytes).decode('utf-8')
-                bg_url = f"data:image/png;base64,{bg_b64}"
             except Exception:
-                bg_url = None
+                bg_bytes = None
 
         # fetch rows for visible ids from DB (preserve table order)
         c = self.conn.cursor()
@@ -664,138 +658,13 @@ class CorrespondenceTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "لا توجد نتائج للتصدير")
             return
 
-        # Debug: log max content length per column
-        column_names = ["م", "رقم الفاكس", "التاريخ", "من", "إلى", "الموضوع", "الملاحظات"]
-        debug_rows = []
-        for idx, r in enumerate(rows):
-            debug_rows.append([
-                str(idx + 1),
-                str(r[0] or ''),
-                str(r[1] or ''),
-                str(r[2] or ''),
-                str(r[3] or ''),
-                str(r[4] or ''),
-                str(r[5] or '')
-            ])
-        print("[Report Debug] Correspondence Report Column Max Lengths:")
-        for col_idx, col_name in enumerate(column_names):
-            max_len = len(str(col_name))
-            for row in debug_rows:
-                if col_idx < len(row):
-                    max_len = max(max_len, len(str(row[col_idx])))
-            print(f"- {col_name}: {max_len} chars")
-        print("")
-
-        # build html
-        html = f"""
-        <html lang="ar">
-        <head>
-          <meta charset="utf-8">
-          <style>
-            @font-face {{
-                    font-family: 'Amiri';
-                    src: url('assets/Amiri-Regular.ttf') format('truetype');
-                }}            
-            body {{ 
-                direction: rtl; 
-                font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif; 
-                font-size: {font_size}px; 
-                {'background: url("'+bg_url+'") no-repeat center center; background-size: contain;' if bg_url else ''} }}
-            table {{ 
-                border-collapse: collapse; 
-                width: 100%; 
-                max-width: 100%;
-                table-layout: fixed; 
-                box-sizing: border-box;
-            }}
-            th, td {{ 
-                border: 1px solid #888; 
-                padding: 6px; 
-                vertical-align: top; 
-                text-align: right; 
-                word-break: break-word;
-                white-space: pre-wrap; 
-                box-sizing: border-box;
-                overflow-wrap: anywhere;
-            }}
-            th {{ 
-                background: #b3d1f7; 
-            }}
-            .no-wrap {{ white-space: nowrap; }}
-            tr {{
-                page-break-inside: avoid;
-            }}
-            tr:nth-child(odd) {{ 
-                background-color: transparent; 
-            }}
-            tr:nth-child(even) {{ 
-                background-color: #f2f2f2; 
-            }}
-            @page {{ 
-                size: {page_size}; 
-                margin: 1cm 0.5cm 1.5cm 0.5cm;
-                @bottom-center {{
-                    content: "الصفحة " counter(page) " من " counter(pages);
-                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: 12px;
-                    color: #444;
-                }}
-            }}
-            @page:first {{
-                @bottom-right {{
-                    content: "موجه الى";
-                    font-family: 'Amiri', 'Cairo', 'Tahoma', sans-serif;
-                    font-size: {font_size}px;
-                    color: #000;
-                    margin-right: 1cm;
-                }}
-            }}
-          </style>
-        </head>
-        <body>
-            <div style="text-align:right; margin-bottom: 8px;">
-                <div style="font-size:13px; color:#1976d2;">{html_escape(first_line_header)}</div>
-                <div style="font-size:13px; color:#1976d2;">{html_escape(second_line_header)}</div>
-            </div>
-          <h2 style="text-align:center;">قائمة المراسلات</h2>
-          <table dir="rtl">
-            <thead>
-              <tr>
-                <th class="no-wrap">مسلسل</th>
-                <th class="no-wrap">رقم الفاكس</th>
-                <th class="no-wrap">التاريخ</th>
-                <th>من</th>
-                <th>إلى</th>
-                <th>الموضوع</th>
-                <th>الملاحظات</th>
-              </tr>
-            </thead>
-            <tbody>
-        """
-
-        for idx, r in enumerate(rows):
-            serial = idx + 1
-            fax_no, fax_date, from_p, to_p, subj, notes, img = r
-            html += (
-                f"<tr><td class='no-wrap'>{serial}</td>"
-                f"<td class='no-wrap'>{html_escape(str(fax_no or ''))}</td>"
-                f"<td class='no-wrap'>{html_escape(str(fax_date or ''))}</td>"
-                f"<td>{html_escape(str(from_p or ''))}</td>"
-                f"<td>{html_escape(str(to_p or ''))}</td>"
-                f"<td>{html_escape(str(subj or ''))}</td>"
-                f"<td>{html_escape(str(notes or '')).replace(chr(10), '<br/>')}</td></tr>"
-            )
-
-        html += """
-            </tbody>
-          </table>
-        </body>
-        </html>
-        """
-
-        try:
-            css = CSS(string=f'@page {{ size: {page_size}; margin: 1cm; }}')
-            HTML(string=html, base_url=os.getcwd()).write_pdf(file_path, stylesheets=[css])
-            QMessageBox.information(self, "تم", "تم تصدير النتائج بنجاح كملف PDF.")
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء التصدير: {e}")
+        export_correspondence_pdf(
+            rows=rows,
+            first_line_header=first_line_header,
+            second_line_header=second_line_header,
+            bg_bytes=bg_bytes,
+            file_path=file_path,
+            font_size=font_size,
+            orientation=orientation,
+            parent=self,
+        )
