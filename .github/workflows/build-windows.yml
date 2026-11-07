@@ -34,7 +34,6 @@ jobs:
             "--icon", "assets/icons/masar.ico",
             "--add-data", "assets;assets",
             "--add-data", "config.json;.",
-            "--add-data", "license.json;.",
             "--add-data", "utils/pdf_bg_utils.py;.",
             "--add-data", "attachments;attachments"
           )

@@ -15,7 +15,7 @@ pytest test_masar.py -v           # all tests
 pytest test_masar.py::TestNormalizeArabic::test_normalize_hamza_variants -v   # single test
 ```
 
-The full PyInstaller build command is in `readme.md` and at the bottom of `main.py` (must `--add-data` assets, config.json, license.json, utils/pdf_bg_utils.py, attachments). There is no linter configured.
+The full PyInstaller build command is in `readme.md` and at the bottom of `main.py` (must `--add-data` assets, config.json, utils/pdf_bg_utils.py, attachments). `license.json` is gitignored and not bundled - `LicenseManager` reads/writes it relative to the exe's working directory at runtime, so a fresh install always starts unactivated. There is no linter configured.
 
 ## Architecture
 
