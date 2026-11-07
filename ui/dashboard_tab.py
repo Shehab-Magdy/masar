@@ -1,6 +1,9 @@
 # ui/dashboard_tab.py
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox, QDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QPushButton, QHBoxLayout, QTableWidgetItem, QInputDialog, QMessageBox, QDialog, QFileDialog
 import datetime
+import os
+import zipfile
+from utils import constants
 from reports.retire_export import export_retire_pdf
 from ui.dialogs.PrintOptionsDialog import PrintOptionsDialog
 
@@ -38,6 +41,9 @@ class DashboardTab(QWidget):
         self.btn_print_retire = QPushButton("تصدير الموظفين الذين تاريخ معاشهم اقترب كـ PDF")
         self.btn_print_retire.clicked.connect(self.on_print_retire_clicked)
         btns_layout.addWidget(self.btn_print_retire)
+        self.btn_backup = QPushButton("نسخة احتياطية")
+        self.btn_backup.clicked.connect(self.backup_data)
+        btns_layout.addWidget(self.btn_backup)
         layout.addLayout(btns_layout)
 
         self.setLayout(layout)
@@ -96,3 +102,35 @@ class DashboardTab(QWidget):
             QMessageBox.warning(self, "تنبيه", "يرجى إدخال رقم موجب أكبر من الصفر لعدد الأشهر.")
             return
         export_retire_pdf(self.conn, months, parent=self, orientation=orientation)
+
+    def backup_data(self):
+        """
+        Zips the database file and the attachments directory into a single
+        timestamped archive at a location chosen by the user.
+        """
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        default_name = f"Masar_Backup_{now}.zip"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ نسخة احتياطية",
+            default_name,
+            "Zip Files (*.zip)"
+        )
+        if not file_path:
+            return
+        try:
+            with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                if os.path.isfile(constants.DB_FILE):
+                    zf.write(constants.DB_FILE, arcname=os.path.basename(constants.DB_FILE))
+                if os.path.isdir(constants.ATTACHMENTS_DIR):
+                    for root, _dirs, files in os.walk(constants.ATTACHMENTS_DIR):
+                        for fname in files:
+                            full_path = os.path.join(root, fname)
+                            arcname = os.path.join(
+                                "attachments",
+                                os.path.relpath(full_path, constants.ATTACHMENTS_DIR)
+                            )
+                            zf.write(full_path, arcname=arcname)
+            QMessageBox.information(self, "تم", "تم إنشاء النسخة الاحتياطية بنجاح.")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"حدث خطأ أثناء إنشاء النسخة الاحتياطية: {e}")
