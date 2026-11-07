@@ -218,3 +218,4 @@ masar.spec
 *.ini
 .DS_Store
 .DS_Store
+license.json

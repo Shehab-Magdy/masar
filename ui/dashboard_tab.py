@@ -28,6 +28,7 @@ class DashboardTab(QWidget):
         self.retire_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.retire_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.retire_table.setSortingEnabled(False)
+        layout.addWidget(self.retire_table)
 
         # Refresh and export buttons
         btns_layout = QHBoxLayout()
